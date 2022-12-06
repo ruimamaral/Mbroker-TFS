@@ -244,8 +244,8 @@ int tfs_unlink(char const *target) {
 
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
 	size_t bytes_read;
-	size_t bytes_written;
-	int verifier;
+	ssize_t bytes_written;
+	
 
 	
 	FILE* source_file = fopen(source_path, "r");
@@ -254,26 +254,33 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
       	return ERROR_VALUE;
    	}
 
-	int tfs = tfs_open(dest_path,"w+");
+	int tfs = tfs_open(dest_path,TFS_O_CREAT | TFS_O_TRUNC);
 	if ( tfs == ERROR_VALUE ){
 		fclose(source_file);
     	fprintf(stderr, "open error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}
 
-	char buffer[BUFFER_SIZE];
+	char buffer[128];
    	memset(buffer,MEMSET_VALUE,sizeof(buffer));
-	while(bytes_read = fread(buffer, sizeof(char) , sizeof(buffer)/sizeof(char),source_file)){
+	while((bytes_read = fread(buffer, sizeof(char) , sizeof(buffer)/sizeof(char),source_file)) > 0){
 		bytes_written = tfs_write(tfs, buffer,bytes_read );
 		if ( bytes_written == ERROR_VALUE){
-			verifier = ERROR_VALUE;
-			break;
+			fprintf(stderr, "writing error: %s\n", strerror(errno));
+      		return ERROR_VALUE;
 		}
 	}
 
-	tfs_close(tfs);
-	fclose(source_file);
-	return verifier;
+	if ( tfs_close(tfs) == ERROR_VALUE){
+    	fprintf(stderr, "close error: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+   	}
+
+	if ( fclose(source_file) == ERROR_VALUE){
+    	fprintf(stderr, "close error: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+   	}
+	return SUCCESS_VALUE;
 
     // variables. TODO: remove
     
