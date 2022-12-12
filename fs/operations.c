@@ -255,7 +255,7 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
    	}
 
 	int tfs = tfs_open(dest_path,TFS_O_CREAT | TFS_O_TRUNC);
-	if ( tfs == ERROR_VALUE ){
+	if ( tfs == ERROR_VALUE ){                                    
 		fclose(source_file);
     	fprintf(stderr, "open error: %s\n", strerror(errno));
       	return ERROR_VALUE;
@@ -263,15 +263,18 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
 
 	char buffer[128];
    	memset(buffer,MEMSET_VALUE,sizeof(buffer));
-	while((bytes_read = fread(buffer, sizeof(char) , sizeof(buffer)/sizeof(char),source_file)) > 0){
+	while((bytes_read = fread(buffer, sizeof(char) , sizeof(buffer)/sizeof(char)-1,source_file)) > 0){
 		bytes_written = tfs_write(tfs, buffer,bytes_read );
-		if ( bytes_written == ERROR_VALUE){
+		if ( bytes_written == ERROR_VALUE || bytes_written != bytes_read){
+			tfs_close(tfs);
+			fclose(source_file);
 			fprintf(stderr, "writing error: %s\n", strerror(errno));
       		return ERROR_VALUE;
 		}
 	}
 
 	if ( tfs_close(tfs) == ERROR_VALUE){
+		fclose(source_file);
     	fprintf(stderr, "close error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}
@@ -280,10 +283,7 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
     	fprintf(stderr, "close error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}
+
 	return SUCCESS_VALUE;
 
-    // variables. TODO: remove
-    
-
-    PANIC("TODO: tfs_copy_from_external_fs");
 }
