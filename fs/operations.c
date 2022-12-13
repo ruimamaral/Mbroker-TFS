@@ -143,13 +143,32 @@ int tfs_sym_link(char const *target, char const *link_name) {
 }
 
 int tfs_link(char const *target, char const *link_name) {
-    (void)target;
-    (void)link_name;
-    // ^ this is a trick to keep the compiler from complaining about unused
-    // variables. TODO: remove
+	inode_t *target_inode;
+	int link_inumber;
+	int value;
+	int target_inumber;
+	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
 
-    PANIC("TODO: tfs_link");
+	if ((link_inumber = tfs_lookup(link_name,dir_inode)) != ERROR_VALUE) {
+		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+   	}
+
+	if ((target_inumber = tfs_lookup(target,dir_inode)) == ERROR_VALUE) {
+		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+   	}
+
+	if((value = add_dir_entry(dir_inode,link_name+1,target_inumber)) == ERROR_VALUE){
+		fprintf(stderr, "add directory entry error: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+   	}
+	target_inode = inode_get(target_inumber);
+	target_inode -> hard_links ++;
+	return SUCCESS_VALUE;
 }
+
+
 
 int tfs_close(int fhandle) {
     open_file_entry_t *file = get_open_file_entry(fhandle);
@@ -236,8 +255,6 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 
 int tfs_unlink(char const *target) {
     (void)target;
-    // ^ this is a trick to keep the compiler from complaining about unused
-    // variables. TODO: remove
 
     PANIC("TODO: tfs_unlink");
 }

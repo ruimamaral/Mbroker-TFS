@@ -25,10 +25,8 @@ void assert_contents_ok(char const *path) {
 void assert_empty_file(char const *path) {
     int f = tfs_open(path, 0);
     assert(f != -1);
-
     uint8_t buffer[sizeof(file_contents)];
     assert(tfs_read(f, buffer, sizeof(buffer)) == 0);
-
     assert(tfs_close(f) != -1);
 }
 
@@ -56,7 +54,6 @@ int main() {
 
     assert(tfs_link(target_path1, link_path1) != -1);
     assert_empty_file(link_path1);
-
     write_contents(link_path1);
     assert_contents_ok(target_path1);
 
