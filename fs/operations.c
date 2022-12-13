@@ -263,21 +263,27 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 int tfs_unlink(char const *target) {
     inode_t* dir_inode = inode_get(ROOT_DIR_INUM);
 	inode_t* target_inode;
-	int target_inumber;
 	inode_type type;
-	if ((target_inumber = tfs_lookup(target,dir_inode)) != ERROR_VALUE) {
+	int target_inumber;
+	if ((target_inumber = tfs_lookup(target,dir_inode)) == ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}
 	target_inode = inode_get(target_inumber);
 	type = target_inode->i_node_type;
-	switch(type){
-		case T_SYMLINK :
-		inode_delete(target_inumber);
-		
-	
+	int hardlinks = target_inode->hard_links--;
 
+	if(type == T_SYMLINK){
+		inode_delete(target_inumber);
 	}
+	else{
+		if(hardlinks == 0){inode_delete(target_inumber);}
+	}
+	if(clear_dir_entry(dir_inode,target+1) == ERROR_VALUE) {
+		fprintf(stderr, "clear directory entry error: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+   	}
+
 	return SUCCESS_VALUE;
 }
 
