@@ -159,11 +159,18 @@ int tfs_link(char const *target, char const *link_name) {
       	return ERROR_VALUE;
    	}
 
+	target_inode = inode_get(target_inumber);
+
+	if(target_inode->i_node_type == T_SYMLINK) {
+		fprintf(stderr, "cannot hardlink a symlink: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+	}
+
 	if((value = add_dir_entry(dir_inode,link_name+1,target_inumber)) == ERROR_VALUE){
 		fprintf(stderr, "add directory entry error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}
-	target_inode = inode_get(target_inumber);
+
 	target_inode -> hard_links ++;
 	return SUCCESS_VALUE;
 }
@@ -254,9 +261,24 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 }
 
 int tfs_unlink(char const *target) {
-    (void)target;
+    inode_t* dir_inode = inode_get(ROOT_DIR_INUM);
+	inode_t* target_inode;
+	int target_inumber;
+	inode_type type;
+	if ((target_inumber = tfs_lookup(target,dir_inode)) != ERROR_VALUE) {
+		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+   	}
+	target_inode = inode_get(target_inumber);
+	type = target_inode->i_node_type;
+	switch(type){
+		case T_SYMLINK :
+		inode_delete(target_inumber);
+		
+	
 
-    PANIC("TODO: tfs_unlink");
+	}
+	return SUCCESS_VALUE;
 }
 
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {

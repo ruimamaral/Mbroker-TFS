@@ -238,6 +238,13 @@ int inode_create(inode_type i_type) {
         inode_table[inumber].i_data_block = -1;
 		inode->hard_links = 1;
         break;
+
+	case T_SYMLINK:
+		inode_table[inumber].i_size = 0;
+        inode_table[inumber].i_data_block = -1;
+		inode->hard_links = 1;
+        break;
+
     default:
         PANIC("inode_create: unknown file type");
     }
@@ -432,7 +439,7 @@ int data_block_alloc(void) {
  */
 void data_block_free(int block_number) {
     ALWAYS_ASSERT(valid_block_number(block_number),
-                  "data_block_free: invalid block number");
+                  "data_block_4free: invalid block number");
 
     insert_delay(); // simulate storage access delay to free_blocks
 
