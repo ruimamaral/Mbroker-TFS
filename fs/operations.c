@@ -269,10 +269,10 @@ int tfs_unlink(char const *target) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}
-	
+
 	target_inode = inode_get(target_inumber);
 	type = target_inode->i_node_type;
-	int hardlinks = target_inode->hard_links--;
+	int hardlinks = --target_inode->hard_links;
 
 	if(type == T_SYMLINK){
 		inode_delete(target_inumber);
