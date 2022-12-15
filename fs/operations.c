@@ -89,6 +89,14 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
     if (inum >= 0) {
         // The file already exists
         inode_t *inode = inode_get(inum);
+		if (inode->i_node_type == T_SYMLINK) {
+			// get actual file inode
+			if ((inum = get_symlink_og_inumber(inum)) == ERROR_VALUE) {
+				printf("fuck you");
+				return ERROR_VALUE;
+			}
+			inode = inode_get(inum);
+		}
         ALWAYS_ASSERT(inode != NULL,
                       "tfs_open: directory files must have an inode");
 
@@ -134,22 +142,42 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 }
 
 int tfs_sym_link(char const *target, char const *link_name) {
-    (void)target;
-    (void)link_name;
-    // ^ this is a trick to keep the compiler from complaining about unused
-    // variables. TODO: remove
+	inode_t *target_inode, *link_inode;
+	int value;
+	int target_inumber, link_inumber;
+	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
+	void *data;
 
-    PANIC("TODO: tfs_sym_link");
+	if (tfs_lookup(link_name, dir_inode) != ERROR_VALUE) {
+		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+   	}
+
+	if ((target_inumber = tfs_lookup(target, dir_inode)) == ERROR_VALUE) {
+		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+   	}
+	if ((link_inumber = inode_create(T_SYMLINK)) == ERROR_VALUE) {
+		fprintf(stderr, "cannot create inode: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+	}
+	link_inode = inode_get(link_inumber);
+	data = data_block_get(link_inode->i_data_block);
+	strcpy(data, target);
+
+	if(add_dir_entry(dir_inode, link_name + 1, link_inumber) == ERROR_VALUE){
+		fprintf(stderr, "add directory entry error: %s\n", strerror(errno));
+      	return ERROR_VALUE;
+   	}
+	return SUCCESS_VALUE;
 }
 
 int tfs_link(char const *target, char const *link_name) {
 	inode_t *target_inode;
-	int link_inumber;
-	int value;
 	int target_inumber;
 	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
 
-	if ((link_inumber = tfs_lookup(link_name,dir_inode)) != ERROR_VALUE) {
+	if (tfs_lookup(link_name,dir_inode) != ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}
@@ -166,7 +194,7 @@ int tfs_link(char const *target, char const *link_name) {
       	return ERROR_VALUE;
 	}
 
-	if((value = add_dir_entry(dir_inode,link_name+1,target_inumber)) == ERROR_VALUE){
+	if(add_dir_entry(dir_inode,link_name+1,target_inumber) == ERROR_VALUE){
 		fprintf(stderr, "add directory entry error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}
