@@ -178,6 +178,24 @@ static int inode_alloc(void) {
     return -1;
 }
 
+
+int inode_create_aux(inode_t* inode,int inumber) {
+	int b = data_block_alloc();
+	if (b == -1) {
+		// ensure fields are initialized
+		inode->i_size = 0;
+		inode->i_data_block = -1;
+
+		// run regular deletion process
+		inode_delete(inumber);
+		return ERROR_VALUE;
+	}
+	inode_table[inumber].i_size = BLOCK_SIZE;
+	inode_table[inumber].i_data_block = b;
+	return SUCCESS_VALUE;
+}
+
+
 /**
  * Create a new inode in the inode table.
  *
@@ -200,30 +218,16 @@ int inode_create(inode_type i_type) {
     if (inumber == -1) {
         return -1; // no free slots in inode table
     }
-
     inode_t *inode = &inode_table[inumber];
     insert_delay(); // simulate storage access delay (to inode)
 
     inode->i_node_type = i_type;
     switch (i_type) {
     case T_DIRECTORY: {
-        // Initializes directory (filling its block with empty entries, labeled
-        // with inumber==-1)
-        int b = data_block_alloc();
-        if (b == -1) {
-            // ensure fields are initialized
-            inode->i_size = 0;
-            inode->i_data_block = -1;
-			inode->hard_links = 1;
-
-            // run regular deletion process
-            inode_delete(inumber);
-            return -1;
-        }
-
-        inode_table[inumber].i_size = BLOCK_SIZE;
-        inode_table[inumber].i_data_block = b;
-
+		if (inode_create_aux(inode,inumber) == ERROR_VALUE){
+			return ERROR_VALUE;
+		} 
+		int b = inode->i_data_block;
         dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(b);
         ALWAYS_ASSERT(dir_entry != NULL,
                       "inode_create: data block freed while in use");
@@ -243,14 +247,17 @@ int inode_create(inode_type i_type) {
 		inode_table[inumber].i_size = 0;
         inode_table[inumber].i_data_block = -1;
 		inode->hard_links = 1;
+		if (inode_create_aux(inode,inumber) == ERROR_VALUE){
+			return ERROR_VALUE;
+		} 
         break;
-
     default:
         PANIC("inode_create: unknown file type");
     }
 
     return inumber;
 }
+
 
 /**
  * Delete an inode.

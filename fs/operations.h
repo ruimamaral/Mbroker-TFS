@@ -47,6 +47,11 @@ typedef enum {
     TFS_O_APPEND = 0b100,
 } tfs_file_mode_t;
 
+
+
+int get_symlink_inumber(int inum);
+
+
 /**
  * Open a file.
  *

@@ -51,6 +51,7 @@ static bool valid_pathname(char const *name) {
     return name != NULL && strlen(name) > 1 && name[0] == '/';
 }
 
+
 /**
  * Looks for a file.
  *
@@ -74,6 +75,16 @@ static int tfs_lookup(char const *name, inode_t const *root_inode) {
     return find_in_dir(root_inode, name);
 }
 
+int get_symlink_inumber(int inum){
+	inode_t *inode = inode_get(inum);
+	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
+	int file_inumber; 
+	if ( (file_inumber = tfs_lookup((char const*)data_block_get(inode->i_data_block),dir_inode)) == ERROR_VALUE){
+      	return ERROR_VALUE;
+   	}
+	return file_inumber;
+}
+
 int tfs_open(char const *name, tfs_file_mode_t mode) {
     // Checks if the path name is valid
     if (!valid_pathname(name)) {
@@ -91,12 +102,12 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
         inode_t *inode = inode_get(inum);
 		if (inode->i_node_type == T_SYMLINK) {
 			// get actual file inode
-			if ((inum = get_symlink_og_inumber(inum)) == ERROR_VALUE) {
-				printf("fuck you");
-				return ERROR_VALUE;
-			}
+			if ((inum = get_symlink_inumber(inum)) == ERROR_VALUE) {
+      			return ERROR_VALUE;
+   			}
 			inode = inode_get(inum);
 		}
+		
         ALWAYS_ASSERT(inode != NULL,
                       "tfs_open: directory files must have an inode");
 
@@ -142,9 +153,8 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 }
 
 int tfs_sym_link(char const *target, char const *link_name) {
-	inode_t *target_inode, *link_inode;
-	int value;
-	int target_inumber, link_inumber;
+	inode_t *link_inode;
+	int link_inumber;
 	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
 	void *data;
 
@@ -153,12 +163,13 @@ int tfs_sym_link(char const *target, char const *link_name) {
       	return ERROR_VALUE;
    	}
 
-	if ((target_inumber = tfs_lookup(target, dir_inode)) == ERROR_VALUE) {
+	if (tfs_lookup(target, dir_inode) == ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}
+	
 	if ((link_inumber = inode_create(T_SYMLINK)) == ERROR_VALUE) {
-		fprintf(stderr, "cannot create inode: %s\n", strerror(errno));
+		fprintf(stderr, "data block cannot be allocated: %s\n", strerror(errno));
       	return ERROR_VALUE;
 	}
 	link_inode = inode_get(link_inumber);
@@ -359,5 +370,4 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
    	}
 
 	return SUCCESS_VALUE;
-
 }
