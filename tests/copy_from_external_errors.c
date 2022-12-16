@@ -17,9 +17,6 @@ int main() {
     // Scenario 1: source file does not exist
     assert(tfs_copy_from_external_fs("./unexistent", path1) == -1);
 
-    // Scenario 2: dest path does not exist
-	assert(tfs_copy_from_external_fs(path1,"/unexistent") == -1);
-
     printf("Successful test.\n");
 
     return 0;
