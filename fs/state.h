@@ -35,6 +35,8 @@ typedef struct {
 
 typedef enum { FREE = 0, TAKEN = 1 } allocation_state_t;
 
+typedef enum { LOCK, UNLOCK } lock_mode;
+
 /**
  * Open file entry (in open file table)
  */

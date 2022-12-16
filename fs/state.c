@@ -27,6 +27,7 @@ static allocation_state_t *free_blocks;
  */
 static open_file_entry_t *open_file_table;
 static allocation_state_t *free_open_file_entries;
+static pthread_mutex_t *open_file_table_mutex;
 
 // Convenience macros
 #define INODE_TABLE_SIZE (fs_params.max_inode_count)
@@ -98,6 +99,8 @@ int state_init(tfs_params params) {
     if (inode_table != NULL) {
         return -1; // already initialized
     }
+
+	mutex_init(open_file_table_mutex);
 
     inode_table = malloc(INODE_TABLE_SIZE * sizeof(inode_t));
     freeinode_ts = malloc(INODE_TABLE_SIZE * sizeof(allocation_state_t));
@@ -530,4 +533,16 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
     }
 
     return &open_file_table[fhandle];
+}
+
+void manage_lock(lock_mode mode, pthread_mutex_t *lock) {
+	if (mode == LOCK) {
+		mutex_lock(lock);
+	} else {
+		mutex_unlock(lock);
+	}
+}
+
+void lock_open_file_table(lock_mode mode) {
+	manage_lock(mode, open_file_table_mutex);
 }

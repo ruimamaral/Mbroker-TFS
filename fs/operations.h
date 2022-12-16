@@ -5,10 +5,9 @@
 #include <sys/types.h>
 
 #define ERROR_VALUE -1
-#define SUCCESS_VALUE 0
+#define SUCCESS_VALUE 1
 #define BUFFER_SIZE 8
 #define MEMSET_VALUE SUCCESS_VALUE
-
 
 /**
  * TécnicoFS parameters.
@@ -49,7 +48,7 @@ typedef enum {
 
 
 
-int get_symlink_inumber(int inum);
+int get_symlink_inumber(int inum, inode_t *dir_inode);
 
 
 /**
