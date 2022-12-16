@@ -75,11 +75,11 @@ static int tfs_lookup(char const *name, inode_t const *root_inode) {
     return find_in_dir(root_inode, name);
 }
 
-int get_symlink_inumber(int inum){
+int get_symlink_inumber(int inum, inode_t *dir_inode) {
 	inode_t *inode = inode_get(inum);
-	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
 	int file_inumber; 
-	if ( (file_inumber = tfs_lookup((char const*)data_block_get(inode->i_data_block),dir_inode)) == ERROR_VALUE){
+	char const *name = (char const*)data_block_get(inode->i_data_block);
+	if ((file_inumber = tfs_lookup(name ,dir_inode)) == ERROR_VALUE) {
       	return ERROR_VALUE;
    	}
 	return file_inumber;
@@ -91,9 +91,11 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
         return -1;
     }
 
+	//Lock table if needed (both tables)
     inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
     ALWAYS_ASSERT(root_dir_inode != NULL,
                   "tfs_open: root dir inode must exist");
+	thread_rwlock_wrlock(root_dir_inode->i_lock);
     int inum = tfs_lookup(name, root_dir_inode);
     size_t offset;
 
@@ -102,7 +104,8 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
         inode_t *inode = inode_get(inum);
 		if (inode->i_node_type == T_SYMLINK) {
 			// get actual file inode
-			if ((inum = get_symlink_inumber(inum)) == ERROR_VALUE) {
+			if ((inum = get_symlink_inumber(inum, root_dir_inode)) == ERROR_VALUE) {
+				thread_rwlock_unlock(root_dir_inode->i_lock);
       			return ERROR_VALUE;
    			}
 			inode = inode_get(inum);
@@ -129,20 +132,26 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
         // Create inode
         inum = inode_create(T_FILE);
         if (inum == -1) {
+			thread_rwlock_unlock(root_dir_inode->i_lock); // check if needed
             return -1; // no space in inode table
         }
 
         // Add entry in the root directory
-        if (add_dir_entry(root_dir_inode, name + 1, inum) == -1) {
+		int valid = add_dir_entry(root_dir_inode, name + 1, inum);
+		thread_rwlock_unlock(root_dir_inode->i_lock);
+        if (valid == -1) {
             inode_delete(inum);
+			thread_rwlock_unlock(root_dir_inode->i_lock);
             return -1; // no space in directory
         }
 
         offset = 0;
     } else {
+		thread_rwlock_unlock(root_dir_inode->i_lock);
         return -1;
     }
 
+	thread_rwlock_unlock(root_dir_inode->i_lock);
     // Finally, add entry to the open file table and return the corresponding
     // handle
     return add_to_open_file_table(inum, offset);
@@ -158,28 +167,35 @@ int tfs_sym_link(char const *target, char const *link_name) {
 	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
 	void *data;
 
+	thread_rwlock_wrlock(dir_inode->i_lock);
+
 	if (tfs_lookup(link_name, dir_inode) != ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+		thread_rwlock_unlock(dir_inode->i_lock);
       	return ERROR_VALUE;
    	}
 
 	if (tfs_lookup(target, dir_inode) == ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+		thread_rwlock_unlock(dir_inode->i_lock);
       	return ERROR_VALUE;
    	}
 	
 	if ((link_inumber = inode_create(T_SYMLINK)) == ERROR_VALUE) {
 		fprintf(stderr, "data block cannot be allocated: %s\n", strerror(errno));
+		thread_rwlock_unlock(dir_inode->i_lock);
       	return ERROR_VALUE;
 	}
 	link_inode = inode_get(link_inumber);
 	data = data_block_get(link_inode->i_data_block);
 	strcpy(data, target);
 
-	if(add_dir_entry(dir_inode, link_name + 1, link_inumber) == ERROR_VALUE){
+	if(add_dir_entry(dir_inode, link_name + 1, link_inumber) == ERROR_VALUE) {
 		fprintf(stderr, "add directory entry error: %s\n", strerror(errno));
+		thread_rwlock_unlock(dir_inode->i_lock);
       	return ERROR_VALUE;
    	}
+	thread_rwlock_unlock(dir_inode->i_lock);
 	return SUCCESS_VALUE;
 }
 
@@ -187,14 +203,17 @@ int tfs_link(char const *target, char const *link_name) {
 	inode_t *target_inode;
 	int target_inumber;
 	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
+	thread_rwlock_wrlock(dir_inode->i_lock);
 
 	if (tfs_lookup(link_name,dir_inode) != ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+		thread_rwlock_unlock(dir_inode->i_lock);
       	return ERROR_VALUE;
    	}
 
 	if ((target_inumber = tfs_lookup(target,dir_inode)) == ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+		thread_rwlock_unlock(dir_inode->i_lock);
       	return ERROR_VALUE;
    	}
 
@@ -202,15 +221,18 @@ int tfs_link(char const *target, char const *link_name) {
 
 	if(target_inode->i_node_type == T_SYMLINK) {
 		fprintf(stderr, "cannot hardlink a symlink: %s\n", strerror(errno));
+		thread_rwlock_unlock(dir_inode->i_lock);
       	return ERROR_VALUE;
 	}
 
-	if(add_dir_entry(dir_inode,link_name+1,target_inumber) == ERROR_VALUE){
+	if(add_dir_entry(dir_inode,link_name+1,target_inumber) == ERROR_VALUE) {
 		fprintf(stderr, "add directory entry error: %s\n", strerror(errno));
+		thread_rwlock_unlock(dir_inode->i_lock);
       	return ERROR_VALUE;
    	}
 
 	target_inode -> hard_links ++;
+	thread_rwlock_unlock(dir_inode->i_lock);
 	return SUCCESS_VALUE;
 }
 
@@ -304,8 +326,10 @@ int tfs_unlink(char const *target) {
 	inode_t* target_inode;
 	inode_type type;
 	int target_inumber;
+	thread_rwlock_wrlock(dir_inode->i_lock);
 	if ((target_inumber = tfs_lookup(target,dir_inode)) == ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+		thread_rwlock_unlock(dir_inode->i_lock);
       	return ERROR_VALUE;
    	}
 
@@ -313,17 +337,21 @@ int tfs_unlink(char const *target) {
 	type = target_inode->i_node_type;
 	int hardlinks = --target_inode->hard_links;
 
-	if(type == T_SYMLINK){
+	if (type == T_SYMLINK) {
 		inode_delete(target_inumber);
 	}
 	else{
-		if(hardlinks == 0){inode_delete(target_inumber);}
+		if (hardlinks == 0) {
+			inode_delete(target_inumber);
+		}
 	}
-	if(clear_dir_entry(dir_inode,target+1) == ERROR_VALUE) {
+	if (clear_dir_entry(dir_inode,target+1) == ERROR_VALUE) {
 		fprintf(stderr, "clear directory entry error: %s\n", strerror(errno));
+		thread_rwlock_unlock(dir_inode->i_lock);
       	return ERROR_VALUE;
    	}
 
+	thread_rwlock_unlock(dir_inode->i_lock);
 	return SUCCESS_VALUE;
 }
 
@@ -331,16 +359,14 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
 	size_t bytes_read;
 	ssize_t bytes_written;
 	
-
-	
 	FILE* source_file = fopen(source_path, "r");
-	if ( !source_file ){
+	if (!source_file) {
     	fprintf(stderr, "open error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}
 
-	int tfs = tfs_open(dest_path,TFS_O_CREAT | TFS_O_TRUNC);
-	if ( tfs == ERROR_VALUE ){                                    
+	int tfs = tfs_open(dest_path, TFS_O_CREAT | TFS_O_TRUNC);
+	if (tfs == ERROR_VALUE) {                                    
 		fclose(source_file);
     	fprintf(stderr, "open error: %s\n", strerror(errno));
       	return ERROR_VALUE;
@@ -348,9 +374,11 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
 
 	char buffer[128];
    	memset(buffer,MEMSET_VALUE,sizeof(buffer));
-	while((bytes_read = fread(buffer, sizeof(char) , sizeof(buffer)/sizeof(char)-1,source_file)) > 0){
+	while ((bytes_read = fread(buffer, sizeof(char),
+			sizeof(buffer)/sizeof(char)-1, source_file)) > 0) {
+
 		bytes_written = tfs_write(tfs, buffer,bytes_read );
-		if ( bytes_written == ERROR_VALUE || bytes_written != bytes_read){
+		if (bytes_written == ERROR_VALUE || bytes_written != bytes_read) {
 			tfs_close(tfs);
 			fclose(source_file);
 			fprintf(stderr, "writing error: %s\n", strerror(errno));
@@ -358,13 +386,13 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
 		}
 	}
 
-	if ( tfs_close(tfs) == ERROR_VALUE){
+	if (tfs_close(tfs) == ERROR_VALUE) {
 		fclose(source_file);
     	fprintf(stderr, "close error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}
 
-	if ( fclose(source_file) == ERROR_VALUE){
+	if (fclose(source_file) == ERROR_VALUE) {
     	fprintf(stderr, "close error: %s\n", strerror(errno));
       	return ERROR_VALUE;
    	}

@@ -224,7 +224,7 @@ int inode_create(inode_type i_type) {
     inode->i_node_type = i_type;
     switch (i_type) {
     case T_DIRECTORY: {
-		if (inode_create_aux(inode,inumber) == ERROR_VALUE){
+		if (inode_create_aux(inode,inumber) == ERROR_VALUE) {
 			return ERROR_VALUE;
 		} 
 		int b = inode->i_data_block;
@@ -247,7 +247,7 @@ int inode_create(inode_type i_type) {
 		inode_table[inumber].i_size = 0;
         inode_table[inumber].i_data_block = -1;
 		inode->hard_links = 1;
-		if (inode_create_aux(inode,inumber) == ERROR_VALUE){
+		if (inode_create_aux(inode,inumber) == ERROR_VALUE) {
 			return ERROR_VALUE;
 		} 
         break;
