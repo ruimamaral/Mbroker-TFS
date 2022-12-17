@@ -408,16 +408,18 @@ int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
    	memset(buffer,MEMSET_VALUE,sizeof(buffer));
 	while ((bytes_read = fread(buffer, sizeof(char),
 			sizeof(buffer)/sizeof(char)-1, source_file)) > 0) {
-
 		bytes_written = tfs_write(tfs, buffer,bytes_read );
-		if (bytes_written == ERROR_VALUE || bytes_written != bytes_read) {
+		if (bytes_written == ERROR_VALUE ) {
 			tfs_close(tfs);
 			fclose(source_file);
 			fprintf(stderr, "writing error: %s\n", strerror(errno));
       		return ERROR_VALUE;
 		}
-	}
+		else if(bytes_written != bytes_read){
+			break;
+		}
 
+	}
 	if (tfs_close(tfs) == ERROR_VALUE) {
 		fclose(source_file);
     	fprintf(stderr, "close error: %s\n", strerror(errno));
