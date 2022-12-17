@@ -48,8 +48,6 @@ typedef enum {
 
 
 
-int get_symlink_inumber(int inum, inode_t *dir_inode);
-
 
 /**
  * Open a file.
