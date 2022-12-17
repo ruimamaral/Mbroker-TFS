@@ -26,19 +26,19 @@ static tfs_params fs_params;
 static inode_t *inode_table;
 static allocation_state_t *freeinode_ts;
 pthread_rwlock_t *inode_locks;
-static pthread_mutex_t *inode_table_lock;
+static pthread_mutex_t inode_table_lock;
 
 // Data blocks
 static char *fs_data; // # blocks * block size
 static allocation_state_t *free_blocks;
-static pthread_mutex_t *dblock_lock;
+static pthread_mutex_t dblock_lock;
 
 /*
  * Volatile FS state
  */
 static open_file_entry_t *open_file_table;
 static allocation_state_t *free_open_file_entries;
-static pthread_mutex_t *open_file_table_mutex;
+static pthread_mutex_t open_file_table_mutex;
 
 static inline bool valid_inumber(int inumber) {
     return inumber >= 0 && inumber < INODE_TABLE_SIZE;
@@ -119,9 +119,9 @@ int state_init(tfs_params params) {
         return -1; // allocation failed
     }
 
-	mutex_init(open_file_table_mutex);
-	mutex_init(inode_table_lock);
-	mutex_init(dblock_lock);
+	mutex_init(&open_file_table_mutex);
+	mutex_init(&inode_table_lock);
+	mutex_init(&dblock_lock);
 
     for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
         freeinode_ts[i] = FREE;
@@ -152,17 +152,11 @@ int state_destroy(void) {
     free(open_file_table);
     free(free_open_file_entries);
 
-	mutex_kill(open_file_table_mutex);
-	free(open_file_table_mutex);
-	open_file_table_mutex = NULL;
+	mutex_kill(&open_file_table_mutex);
 
-	mutex_kill(dblock_lock);
-	free(dblock_lock);
-	dblock_lock = NULL;
+	mutex_kill(&dblock_lock);
 
-	mutex_kill(inode_table_lock);
-	free(inode_table_lock);
-	inode_table_lock = NULL;
+	mutex_kill(&inode_table_lock);
 
     for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
 		rwlock_kill(&inode_locks[i]);
@@ -244,10 +238,10 @@ int inode_create_aux(inode_t* inode,int inumber) {
  *   - (if creating a directory) No free data blocks.
  */
 int inode_create(inode_type i_type) {
-	mutex_lock(inode_table_lock);
+	mutex_lock(&inode_table_lock);
     int inumber = inode_alloc();
     if (inumber == -1) {
-		mutex_unlock(inode_table_lock);
+		mutex_unlock(&inode_table_lock);
         return -1; // no free slots in inode table
     }
     inode_t *inode = &inode_table[inumber];
@@ -257,7 +251,7 @@ int inode_create(inode_type i_type) {
     switch (i_type) {
     case T_DIRECTORY: {
 		if (inode_create_aux(inode,inumber) == ERROR_VALUE) {
-			mutex_unlock(inode_table_lock);
+			mutex_unlock(&inode_table_lock);
 			return ERROR_VALUE;
 		} 
 		int b = inode->i_data_block;
@@ -281,7 +275,7 @@ int inode_create(inode_type i_type) {
         inode_table[inumber].i_data_block = -1;
 		inode->i_hard_links = 1;
 		if (inode_create_aux(inode,inumber) == ERROR_VALUE) {
-			mutex_unlock(inode_table_lock);
+			mutex_unlock(&inode_table_lock);
 			return ERROR_VALUE;
 		} 
         break;
@@ -289,7 +283,7 @@ int inode_create(inode_type i_type) {
         PANIC("inode_create: unknown file type");
     }
 
-	mutex_unlock(inode_table_lock);
+	mutex_unlock(&inode_table_lock);
     return inumber;
 }
 
@@ -307,7 +301,7 @@ void inode_delete(int inumber) {
 
     ALWAYS_ASSERT(valid_inumber(inumber), "inode_delete: invalid inumber");
 
-	mutex_lock(inode_table_lock);
+	mutex_lock(&inode_table_lock);
 
     ALWAYS_ASSERT(freeinode_ts[inumber] == TAKEN,
                   "inode_delete: inode already freed");
@@ -317,7 +311,7 @@ void inode_delete(int inumber) {
     }
 
     freeinode_ts[inumber] = FREE;
-	mutex_unlock(inode_table_lock);
+	mutex_unlock(&inode_table_lock);
 }
 
 /**
@@ -463,7 +457,7 @@ int find_in_dir(inode_t const *inode, char const *sub_name) {
  *   - No free data blocks.
  */
 int data_block_alloc(void) {
-	mutex_lock(dblock_lock);
+	mutex_lock(&dblock_lock);
     for (size_t i = 0; i < DATA_BLOCKS; i++) {
         if (i * sizeof(allocation_state_t) % BLOCK_SIZE == 0) {
             insert_delay(); // simulate storage access delay to free_blocks
@@ -472,11 +466,11 @@ int data_block_alloc(void) {
         if (free_blocks[i] == FREE) {
             free_blocks[i] = TAKEN;
 	
-			mutex_unlock(dblock_lock);
+			mutex_unlock(&dblock_lock);
             return (int)i;
         }
     }
-	mutex_unlock(dblock_lock);
+	mutex_unlock(&dblock_lock);
     return -1;
 }
 
@@ -524,19 +518,19 @@ void *data_block_get(int block_number) {
  *   - No space in open file table for a new open file.
  */
 int add_to_open_file_table(int inumber, size_t offset) {
-	mutex_lock(open_file_table_mutex);
+	mutex_lock(&open_file_table_mutex);
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (free_open_file_entries[i] == FREE) {
             free_open_file_entries[i] = TAKEN;
             open_file_table[i].of_inumber = inumber;
             open_file_table[i].of_offset = offset;
 
-			mutex_unlock(open_file_table_mutex);
+			mutex_unlock(&open_file_table_mutex);
             return i;
         }
     }
 
-	mutex_unlock(open_file_table_mutex);
+	mutex_unlock(&open_file_table_mutex);
     return -1;
 }
 
@@ -550,12 +544,12 @@ void remove_from_open_file_table(int fhandle) {
     ALWAYS_ASSERT(valid_file_handle(fhandle),
                   "remove_from_open_file_table: file handle must be valid");
 
-	mutex_lock(open_file_table_mutex);
+	mutex_lock(&open_file_table_mutex);
     ALWAYS_ASSERT(free_open_file_entries[fhandle] == TAKEN,
                   "remove_from_open_file_table: file handle must be taken");
 
     free_open_file_entries[fhandle] = FREE;
-	mutex_unlock(open_file_table_mutex);
+	mutex_unlock(&open_file_table_mutex);
 }
 
 /**
@@ -572,13 +566,13 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
         return NULL;
     }
 	
-	mutex_lock(open_file_table_mutex);
+	mutex_lock(&open_file_table_mutex);
 
     if (free_open_file_entries[fhandle] != TAKEN) {
         return NULL;
     }
 
-	mutex_unlock(open_file_table_mutex);
+	mutex_unlock(&open_file_table_mutex);
     return &open_file_table[fhandle];
 }
 
@@ -591,8 +585,8 @@ void manage_lock(lock_mode mode, pthread_mutex_t *lock) {
 }
 
 void lock_open_file_table() {
-	manage_lock(LOCK, open_file_table_mutex);
+	manage_lock(LOCK, &open_file_table_mutex);
 }
 void unlock_open_file_table() {
-	manage_lock(UNLOCK, open_file_table_mutex);
+	manage_lock(UNLOCK, &open_file_table_mutex);
 }
