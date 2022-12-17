@@ -8,6 +8,13 @@
 #include <string.h>
 #include <unistd.h>
 
+// Convenience macros
+#define INODE_TABLE_SIZE (fs_params.max_inode_count)
+#define DATA_BLOCKS (fs_params.max_block_count)
+#define MAX_OPEN_FILES (fs_params.max_open_files_count)
+#define BLOCK_SIZE (fs_params.block_size)
+#define MAX_DIR_ENTRIES (BLOCK_SIZE / sizeof(dir_entry_t))
+
 /*
  * Persistent FS state
  * (in reality, it should be maintained in secondary memory;
@@ -18,6 +25,7 @@ static tfs_params fs_params;
 // Inode table
 static inode_t *inode_table;
 static allocation_state_t *freeinode_ts;
+static pthread_rwlock_t *inode_locks;
 
 // Data blocks
 static char *fs_data; // # blocks * block size
@@ -29,13 +37,6 @@ static allocation_state_t *free_blocks;
 static open_file_entry_t *open_file_table;
 static allocation_state_t *free_open_file_entries;
 static pthread_mutex_t *open_file_table_mutex;
-
-// Convenience macros
-#define INODE_TABLE_SIZE (fs_params.max_inode_count)
-#define DATA_BLOCKS (fs_params.max_block_count)
-#define MAX_OPEN_FILES (fs_params.max_open_files_count)
-#define BLOCK_SIZE (fs_params.block_size)
-#define MAX_DIR_ENTRIES (BLOCK_SIZE / sizeof(dir_entry_t))
 
 static inline bool valid_inumber(int inumber) {
     return inumber >= 0 && inumber < INODE_TABLE_SIZE;
@@ -99,10 +100,9 @@ int state_init(tfs_params params) {
 
     if (inode_table != NULL) {
         return -1; // already initialized
-    }
+	}
 
-	mutex_init(open_file_table_mutex);
-
+	inode_locks = malloc(INODE_TABLE_SIZE * sizeof(pthread_rwlock_t));
     inode_table = malloc(INODE_TABLE_SIZE * sizeof(inode_t));
     freeinode_ts = malloc(INODE_TABLE_SIZE * sizeof(allocation_state_t));
     fs_data = malloc(DATA_BLOCKS * BLOCK_SIZE);
@@ -110,14 +110,18 @@ int state_init(tfs_params params) {
     open_file_table = malloc(MAX_OPEN_FILES * sizeof(open_file_entry_t));
     free_open_file_entries =
         malloc(MAX_OPEN_FILES * sizeof(allocation_state_t));
+	
 
     if (!inode_table || !freeinode_ts || !fs_data || !free_blocks ||
-        !open_file_table || !free_open_file_entries) {
+        !open_file_table || !free_open_file_entries || !inode_locks) {
         return -1; // allocation failed
     }
 
+	mutex_init(open_file_table_mutex);
+
     for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
         freeinode_ts[i] = FREE;
+		rwlock_init(&inode_locks[i]);
     }
 
     for (size_t i = 0; i < DATA_BLOCKS; i++) {
@@ -147,6 +151,12 @@ int state_destroy(void) {
 	mutex_kill(open_file_table_mutex);
 	free(open_file_table_mutex);
 	open_file_table_mutex = NULL;
+
+    for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
+		rwlock_kill(&inode_locks[i]);
+    }
+	free(inode_locks);
+	inode_locks = NULL;
 
     inode_table = NULL;
     freeinode_ts = NULL;

@@ -44,6 +44,8 @@ typedef struct {
     size_t of_offset;
 } open_file_entry_t;
 
+extern pthread_rwlock_t *inode_locks;
+
 int state_init(tfs_params);
 int state_destroy(void);
 
