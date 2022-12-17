@@ -181,11 +181,6 @@ int tfs_sym_link(char const *target, char const *link_name) {
 	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
 	void *data;
 
-    // Checks if the path name is valid
-    if (!valid_pathname(link_name) || !valid_pathname(target)) {
-        return ERROR_VALUE;
-    }
-
 	mutex_lock(global_mutex);
 
 	if (tfs_lookup(link_name, dir_inode) != ERROR_VALUE) {
@@ -222,11 +217,6 @@ int tfs_link(char const *target, char const *link_name) {
 	inode_t *target_inode;
 	int target_inumber;
 	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
-
-    // Checks if the path name is valid
-    if (!valid_pathname(link_name) || !valid_pathname(target)) {
-        return ERROR_VALUE;
-    }
 
 	mutex_lock(global_mutex);
 
@@ -371,6 +361,12 @@ int tfs_unlink(char const *target) {
    	}
 
 	target_inode = inode_get(target_inumber);
+	if( target_inode->i_node_type == T_DIRECTORY) {
+		fprintf(stderr, "cannot unlink root directory: %s\n", strerror(errno));
+		mutex_unlock(global_mutex);
+		return ERROR_VALUE;
+	}
+
 	type = target_inode->i_node_type;
 	int hardlinks = --target_inode->i_hard_links;
 
