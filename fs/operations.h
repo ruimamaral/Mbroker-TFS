@@ -6,6 +6,8 @@
 
 #define ERROR_VALUE -1
 #define SUCCESS_VALUE 0
+#define TRUE 0
+#define FALSE -1
 #define BUFFER_SIZE 8
 #define MEMSET_VALUE SUCCESS_VALUE
 

@@ -540,11 +540,11 @@ int file_is_open(int inumber) {
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (free_open_file_entries[i] == TAKEN && open_file_table[i].of_inumber == inumber) {
 			mutex_unlock(&open_file_table_mutex);
-            return SUCCESS_VALUE;
+            return TRUE;
         }
     }
 	mutex_unlock(&open_file_table_mutex);
-    return ERROR_VALUE;
+    return FALSE;
 }
 
 /**

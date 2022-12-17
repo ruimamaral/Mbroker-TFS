@@ -373,7 +373,7 @@ int tfs_unlink(char const *target) {
 		inode_delete(target_inumber);
 	}
 	else{
-		if( file_is_open(target_inumber) == SUCCESS_VALUE){
+		if(file_is_open(target_inumber) == TRUE ){
 			fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
 			mutex_unlock(&root_lock);
       		return ERROR_VALUE;
