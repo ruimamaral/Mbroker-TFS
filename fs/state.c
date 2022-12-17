@@ -1,5 +1,6 @@
 #include "state.h"
 #include "betterassert.h"
+#include "locks.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -143,6 +144,10 @@ int state_destroy(void) {
     free(open_file_table);
     free(free_open_file_entries);
 
+	mutex_kill(open_file_table_mutex);
+	free(open_file_table_mutex);
+	open_file_table_mutex = NULL;
+
     inode_table = NULL;
     freeinode_ts = NULL;
     fs_data = NULL;
@@ -243,13 +248,13 @@ int inode_create(inode_type i_type) {
         // In case of a new file, simply sets its size to 0
         inode_table[inumber].i_size = 0;
         inode_table[inumber].i_data_block = -1;
-		inode->hard_links = 1;
+		inode->i_hard_links = 1;
         break;
 
 	case T_SYMLINK:
 		inode_table[inumber].i_size = 0;
         inode_table[inumber].i_data_block = -1;
-		inode->hard_links = 1;
+		inode->i_hard_links = 1;
 		if (inode_create_aux(inode,inumber) == ERROR_VALUE) {
 			return ERROR_VALUE;
 		} 
@@ -485,16 +490,19 @@ void *data_block_get(int block_number) {
  *   - No space in open file table for a new open file.
  */
 int add_to_open_file_table(int inumber, size_t offset) {
+	mutex_lock(open_file_table_mutex);
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (free_open_file_entries[i] == FREE) {
             free_open_file_entries[i] = TAKEN;
             open_file_table[i].of_inumber = inumber;
             open_file_table[i].of_offset = offset;
 
+			mutex_unlock(open_file_table_mutex);
             return i;
         }
     }
 
+	mutex_unlock(open_file_table_mutex);
     return -1;
 }
 
@@ -508,10 +516,12 @@ void remove_from_open_file_table(int fhandle) {
     ALWAYS_ASSERT(valid_file_handle(fhandle),
                   "remove_from_open_file_table: file handle must be valid");
 
+	mutex_lock(open_file_table_mutex);
     ALWAYS_ASSERT(free_open_file_entries[fhandle] == TAKEN,
                   "remove_from_open_file_table: file handle must be taken");
 
     free_open_file_entries[fhandle] = FREE;
+	mutex_unlock(open_file_table_mutex);
 }
 
 /**
@@ -527,11 +537,14 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
     if (!valid_file_handle(fhandle)) {
         return NULL;
     }
+	
+	mutex_lock(open_file_table_mutex);
 
     if (free_open_file_entries[fhandle] != TAKEN) {
         return NULL;
     }
 
+	mutex_unlock(open_file_table_mutex);
     return &open_file_table[fhandle];
 }
 
@@ -543,6 +556,9 @@ void manage_lock(lock_mode mode, pthread_mutex_t *lock) {
 	}
 }
 
-void lock_open_file_table(lock_mode mode) {
-	manage_lock(mode, open_file_table_mutex);
+void lock_open_file_table() {
+	manage_lock(LOCK, open_file_table_mutex);
+}
+void unlock_open_file_table() {
+	manage_lock(UNLOCK, open_file_table_mutex);
 }

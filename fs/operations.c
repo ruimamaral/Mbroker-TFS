@@ -1,6 +1,8 @@
 #include "operations.h"
 #include "config.h"
 #include "state.h"
+#include "locks.h"
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,7 +12,7 @@
 #include "betterassert.h"
 
 // Locks functionalities that involve creating new files
-static pthread_mutex_t global_mutex;
+static pthread_mutex_t *global_mutex;
 
 tfs_params tfs_default_params() {
     tfs_params params = {
@@ -79,11 +81,18 @@ static int tfs_lookup(char const *name, inode_t const *root_inode) {
     return find_in_dir(root_inode, name);
 }
 
+// Move to state.c
 int get_symlink_inumber(int inum, inode_t *dir_inode) {
 	inode_t *inode = inode_get(inum);
+
+    ALWAYS_ASSERT(dir_inode != NULL,
+                  "get_symlink_inumber: invalid directory inode");
+	ALWAYS_ASSERT(inode->i_node_type == T_SYMLINK,
+			"get_symlink_inumber: inode must represent a symlink");
+
 	int file_inumber; 
 	char const *name = (char const*)data_block_get(inode->i_data_block);
-	if ((file_inumber = tfs_lookup(name ,dir_inode)) == ERROR_VALUE) {
+	if ((file_inumber = tfs_lookup(name, dir_inode)) == ERROR_VALUE) {
       	return ERROR_VALUE;
    	}
 	return file_inumber;
@@ -172,6 +181,11 @@ int tfs_sym_link(char const *target, char const *link_name) {
 	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
 	void *data;
 
+    // Checks if the path name is valid
+    if (!valid_pathname(link_name) || !valid_pathname(target)) {
+        return ERROR_VALUE;
+    }
+
 	mutex_lock(global_mutex);
 
 	if (tfs_lookup(link_name, dir_inode) != ERROR_VALUE) {
@@ -208,9 +222,15 @@ int tfs_link(char const *target, char const *link_name) {
 	inode_t *target_inode;
 	int target_inumber;
 	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
+
+    // Checks if the path name is valid
+    if (!valid_pathname(link_name) || !valid_pathname(target)) {
+        return ERROR_VALUE;
+    }
+
 	mutex_lock(global_mutex);
 
-	if (tfs_lookup(link_name,dir_inode) != ERROR_VALUE) {
+	if (tfs_lookup(link_name, dir_inode) != ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
 		mutex_unlock(global_mutex);
       	return ERROR_VALUE;
@@ -236,7 +256,7 @@ int tfs_link(char const *target, char const *link_name) {
       	return ERROR_VALUE;
    	}
 
-	target_inode -> hard_links ++;
+	target_inode->i_hard_links++;
 	mutex_unlock(global_mutex);
 	return SUCCESS_VALUE;
 }
@@ -244,12 +264,14 @@ int tfs_link(char const *target, char const *link_name) {
 
 
 int tfs_close(int fhandle) {
+	lock_open_file_table();
     open_file_entry_t *file = get_open_file_entry(fhandle);
     if (file == NULL) {
         return -1; // invalid fd
     }
 
     remove_from_open_file_table(fhandle);
+	unlock_open_file_table();
 
     return 0;
 }
@@ -340,7 +362,7 @@ int tfs_unlink(char const *target) {
 
 	target_inode = inode_get(target_inumber);
 	type = target_inode->i_node_type;
-	int hardlinks = --target_inode->hard_links;
+	int hardlinks = --target_inode->i_hard_links;
 
 	if (type == T_SYMLINK) {
 		inode_delete(target_inumber);
