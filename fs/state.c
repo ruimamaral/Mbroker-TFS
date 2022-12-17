@@ -25,7 +25,7 @@ static tfs_params fs_params;
 // Inode table
 static inode_t *inode_table;
 static allocation_state_t *freeinode_ts;
-static pthread_rwlock_t *inode_locks;
+pthread_rwlock_t *inode_locks;
 static pthread_mutex_t *inode_table_lock;
 
 // Data blocks
@@ -244,7 +244,7 @@ int inode_create_aux(inode_t* inode,int inumber) {
  *   - (if creating a directory) No free data blocks.
  */
 int inode_create(inode_type i_type) {
-	mutex_wrlock(inode_table_lock);
+	mutex_lock(inode_table_lock);
     int inumber = inode_alloc();
     if (inumber == -1) {
 		mutex_unlock(inode_table_lock);
@@ -307,7 +307,7 @@ void inode_delete(int inumber) {
 
     ALWAYS_ASSERT(valid_inumber(inumber), "inode_delete: invalid inumber");
 
-	mutex_wrlock(inode_table_lock);
+	mutex_lock(inode_table_lock);
 
     ALWAYS_ASSERT(freeinode_ts[inumber] == TAKEN,
                   "inode_delete: inode already freed");
