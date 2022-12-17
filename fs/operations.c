@@ -358,13 +358,13 @@ int tfs_unlink(char const *target) {
 		mutex_unlock(&root_lock);
       	return ERROR_VALUE;
    	}
-
 	target_inode = inode_get(target_inumber);
-	if( target_inode->i_node_type == T_DIRECTORY) {
-		fprintf(stderr, "cannot unlink root directory: %s\n", strerror(errno));
+
+	/* if( target_inode->i_node_type == T_DIRECTORY) {
+		fprintf(stderr, "cannot unlink directory: %s\n", strerror(errno));
 		mutex_unlock(&root_lock);
 		return ERROR_VALUE;
-	}
+	} */
 
 	type = target_inode->i_node_type;
 	int hardlinks = --target_inode->i_hard_links;
@@ -373,6 +373,11 @@ int tfs_unlink(char const *target) {
 		inode_delete(target_inumber);
 	}
 	else{
+		if( file_is_open(target_inumber) == SUCCESS_VALUE){
+			fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+			mutex_unlock(&root_lock);
+      		return ERROR_VALUE;
+		}
 		if (hardlinks == 0) {
 			inode_delete(target_inumber);
 		}

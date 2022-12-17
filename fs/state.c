@@ -534,6 +534,19 @@ int add_to_open_file_table(int inumber, size_t offset) {
     return -1;
 }
 
+
+int file_is_open(int inumber) {
+	mutex_lock(&open_file_table_mutex);
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (free_open_file_entries[i] == TAKEN && open_file_table[i].of_inumber == inumber) {
+			mutex_unlock(&open_file_table_mutex);
+            return SUCCESS_VALUE;
+        }
+    }
+	mutex_unlock(&open_file_table_mutex);
+    return ERROR_VALUE;
+}
+
 /**
  * Free an entry from the open file table.
  *
