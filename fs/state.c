@@ -306,12 +306,15 @@ void inode_delete(int inumber) {
     ALWAYS_ASSERT(freeinode_ts[inumber] == TAKEN,
                   "inode_delete: inode already freed");
 
+	rwlock_wrlock(&inode_locks[inumber]);
+
     if (inode_table[inumber].i_size > 0) {
         data_block_free(inode_table[inumber].i_data_block);
     }
 
     freeinode_ts[inumber] = FREE;
 	mutex_unlock(&inode_table_lock);
+	rwlock_unlock(&inode_locks[inumber]);
 }
 
 /**
@@ -584,22 +587,8 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
     if (free_open_file_entries[fhandle] != TAKEN) {
         return NULL;
     }
+	open_file_entry_t *return_val = &open_file_table[fhandle];
 
 	mutex_unlock(&open_file_table_mutex);
-    return &open_file_table[fhandle];
-}
-
-void manage_lock(lock_mode mode, pthread_mutex_t *lock) {
-	if (mode == LOCK) {
-		mutex_lock(lock);
-	} else {
-		mutex_unlock(lock);
-	}
-}
-
-void lock_open_file_table() {
-	manage_lock(LOCK, &open_file_table_mutex);
-}
-void unlock_open_file_table() {
-	manage_lock(UNLOCK, &open_file_table_mutex);
+	return return_val;
 }

@@ -95,6 +95,7 @@ int get_symlink_inumber(int inum, inode_t *dir_inode) {
 	int file_inumber; 
 	char const *name = (char const*)data_block_get(inode->i_data_block);
 	if ((file_inumber = tfs_lookup(name, dir_inode)) == ERROR_VALUE) {
+		// Original file has been deleted
       	return ERROR_VALUE;
    	}
 	return file_inumber;
@@ -154,7 +155,6 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 
         // Add entry in the root directory
 		int valid = add_dir_entry(root_dir_inode, name + 1, inum);
-		mutex_unlock(&root_lock);
         if (valid == -1) {
             inode_delete(inum);
 			mutex_unlock(&root_lock);
@@ -167,11 +167,12 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
         return -1;
     }
 
-	mutex_unlock(&root_lock);
-
     // Finally, add entry to the open file table and return the corresponding
     // handle
-    return add_to_open_file_table(inum, offset);
+	int return_val = add_to_open_file_table(inum, offset);
+	mutex_unlock(&root_lock);
+
+    return return_val;
 
     // Note: for simplification, if file was created with TFS_O_CREAT and there
     // is an error adding an entry to the open file table, the file is not
@@ -243,7 +244,7 @@ int tfs_link(char const *target, char const *link_name) {
       	return ERROR_VALUE;
 	}
 
-	if(add_dir_entry(dir_inode,link_name+1,target_inumber) == ERROR_VALUE) {
+	if(add_dir_entry(dir_inode, link_name+1, target_inumber) == ERROR_VALUE) {
 		fprintf(stderr, "add directory entry error: %s\n", strerror(errno));
 		mutex_unlock(&root_lock);
       	return ERROR_VALUE;
@@ -259,8 +260,12 @@ int tfs_close(int fhandle) {
     if (file == NULL) {
         return -1; // invalid fd
     }
+	// Prevents file being closed mid read/write
+	rwlock_wrlock(file->of_inumber); // TEMP check if needed
 
     remove_from_open_file_table(fhandle);
+
+	rwlock_unlock(file->of_inumber);
 
     return 0;
 }
@@ -353,7 +358,7 @@ int tfs_unlink(char const *target) {
 	inode_type type;
 	int target_inumber;
 	mutex_lock(&root_lock);
-	if ((target_inumber = tfs_lookup(target,dir_inode)) == ERROR_VALUE) {
+	if ((target_inumber = tfs_lookup(target, dir_inode)) == ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
 		mutex_unlock(&root_lock);
       	return ERROR_VALUE;
@@ -371,9 +376,8 @@ int tfs_unlink(char const *target) {
 
 	if (type == T_SYMLINK) {
 		inode_delete(target_inumber);
-	}
-	else{
-		if(file_is_open(target_inumber) == TRUE ){
+	} else {
+		if (file_is_open(target_inumber) == TRUE){
 			fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
 			mutex_unlock(&root_lock);
       		return ERROR_VALUE;
@@ -382,11 +386,8 @@ int tfs_unlink(char const *target) {
 			inode_delete(target_inumber);
 		}
 	}
-	if (clear_dir_entry(dir_inode,target+1) == ERROR_VALUE) {
-		fprintf(stderr, "clear directory entry error: %s\n", strerror(errno));
-		mutex_unlock(&root_lock);
-      	return ERROR_VALUE;
-   	}
+	ALWAYS_ASSERT(clear_dir_entry(dir_inode,
+			target + 1) != ERROR_VALUE, "clear directory entry error");
 
 	mutex_unlock(&root_lock);
 	return SUCCESS_VALUE;
