@@ -70,8 +70,7 @@ static bool valid_pathname(char const *name) {
  * Returns the inumber of the file, -1 if unsuccessful.
  */
 static int tfs_lookup(char const *name, inode_t const *root_inode) {
-    // TODO: assert that root_inode is the root directory
-    if (!valid_pathname(name)) {
+    if (!valid_pathname(name) || root_inode->i_node_type != T_DIRECTORY) {
         return -1;
     }
 
@@ -81,14 +80,13 @@ static int tfs_lookup(char const *name, inode_t const *root_inode) {
     return find_in_dir(root_inode, name);
 }
 
-// Move to state.c
 int get_symlink_inumber(int inum, inode_t *dir_inode) {
 	inode_t *inode = inode_get(inum);
 
     ALWAYS_ASSERT(dir_inode != NULL,
-                  "get_symlink_inumber: invalid directory inode");
+            "get_symlink_inumber: invalid directory inode");
     ALWAYS_ASSERT(inode != NULL,
-                  "get_symlink_inumber: inode must exist");
+            "get_symlink_inumber: inode must exist");
 	ALWAYS_ASSERT(inode->i_node_type == T_SYMLINK,
 			"get_symlink_inumber: inode must represent a symlink");
 
@@ -121,14 +119,19 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
         ALWAYS_ASSERT(inode != NULL,
                       "tfs_open: directory files must have an inode");
 
-		if (inode->i_node_type == T_SYMLINK) {
-			// get actual file inode
-			if ((inum = get_symlink_inumber(inum, root_dir_inode)) == ERROR_VALUE) {
+		while (inode->i_node_type == T_SYMLINK) {
+			if ((inum = get_symlink_inumber(inum,
+					root_dir_inode)) == ERROR_VALUE) {
 				mutex_unlock(&root_lock);
-      			return ERROR_VALUE;
-   			}
-			// We already know the inode exists
+				return ERROR_VALUE;
+			}
 			inode = inode_get(inum);
+			ALWAYS_ASSERT(inode != NULL,
+					"tfs_open: file inode not found");
+		}
+		if (inode->i_node_type == T_DIRECTORY) {
+			mutex_unlock(&root_lock);
+			return ERROR_VALUE;
 		}
 		
         // Truncate (if requested)
@@ -260,12 +263,12 @@ int tfs_close(int fhandle) {
     if (file == NULL) {
         return -1; // invalid fd
     }
-	// Prevents file being closed mid read/write
-	rwlock_wrlock(file->of_inumber); // TEMP check if needed
+	// TEMP Prevents file being closed mid read/write
+	// rwlock_wrlock(file->of_inumber);
 
     remove_from_open_file_table(fhandle);
 
-	rwlock_unlock(file->of_inumber);
+	// rwlock_unlock(file->of_inumber);
 
     return 0;
 }
