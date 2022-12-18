@@ -345,10 +345,6 @@ inode_t *inode_get(int inumber) {
  * Returns the inumber of the file, -1 if unsuccessful.
  */
 int fetch_file(char const *name, inode_t const *root_inode) {
-	if (!valid_pathname(name) || root_inode->i_node_type != T_DIRECTORY) {
-		return -1;
-	}
-
 	// skip the initial '/' character
 	name++;
 

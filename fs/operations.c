@@ -70,6 +70,9 @@ static bool valid_pathname(char const *name) {
  * Returns the inumber of the file, -1 if unsuccessful.
  */
 static int tfs_lookup(char const *name, inode_t const *root_inode) {
+	if (!valid_pathname(name) || root_inode->i_node_type != T_DIRECTORY) {
+		return -1;
+	}
 	return fetch_file(name, root_inode);
 }
 
