@@ -15,11 +15,11 @@
  * TécnicoFS parameters.
  */
 typedef struct {
-    size_t max_inode_count;
-    size_t max_block_count;
-    size_t max_open_files_count;
+	size_t max_inode_count;
+	size_t max_block_count;
+	size_t max_open_files_count;
 
-    size_t block_size;
+	size_t block_size;
 } tfs_params;
 
 /**
@@ -43,9 +43,9 @@ int tfs_destroy();
  * TécnicoFS file opening modes.
  */
 typedef enum {
-    TFS_O_CREAT = 0b001,
-    TFS_O_TRUNC = 0b010,
-    TFS_O_APPEND = 0b100,
+	TFS_O_CREAT = 0b001,
+	TFS_O_TRUNC = 0b010,
+	TFS_O_APPEND = 0b100,
 } tfs_file_mode_t;
 
 
@@ -57,9 +57,9 @@ typedef enum {
  * Input:
  *   - name: absolute path name
  *   - mode: can be a combination (with bitwise or) of the following flags:
- *     - append mode (TFS_O_APPEND)
- *     - truncate file contents (TFS_O_TRUNC)
- *     - create file if it does not exist (TFS_O_CREAT)
+ *	 - append mode (TFS_O_APPEND)
+ *	 - truncate file contents (TFS_O_TRUNC)
+ *	 - create file if it does not exist (TFS_O_CREAT)
  *
  * Returns file handle of the opened file if successful, -1 otherwise.
  */
@@ -141,7 +141,7 @@ int tfs_unlink(char const *target);
  * Input:
  *   - source_path: path name of the source file (from the OS' file system)
  *   - dest_path: absolute path name of the destination file (in TécnicoFS),
- *    which is created if needed, and overwritten if it already exists.
+ *	which is created if needed, and overwritten if it already exists.
  *
  * Returns 0 if successful, -1 otherwise.
  */
