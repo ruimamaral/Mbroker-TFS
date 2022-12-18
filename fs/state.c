@@ -309,7 +309,7 @@ void inode_delete(int inumber) {
 	rwlock_wrlock(&inode_locks[inumber]);
 
 	if (inode_table[inumber].i_size > 0) {
-		data_block_free(inode_table[inumber].i_data_block);
+		data_block_free(inode_table[inumber].i_data_block); // TEMP maybe lock
 	}
 
 	freeinode_ts[inumber] = FREE;
@@ -331,6 +331,56 @@ inode_t *inode_get(int inumber) {
 	insert_delay(); // simulate storage access delay to inode
 	inode_t *inode = &inode_table[inumber];
 	return inode;
+}
+
+/**
+ * Looks for a file.
+ *
+ * Note: as a simplification, only a plain directory space (root directory only)
+ * is supported.
+ *
+ * Input:
+ *   - name: absolute path name
+ *   - root_inode: the root directory inode
+ * Returns the inumber of the file, -1 if unsuccessful.
+ */
+int fetch_file(char const *name, inode_t const *root_inode) {
+	if (!valid_pathname(name) || root_inode->i_node_type != T_DIRECTORY) {
+		return -1;
+	}
+
+	// skip the initial '/' character
+	name++;
+
+	return find_in_dir(root_inode, name);
+}
+
+/**
+ * Gets original file from a symlink.
+ * 
+ * Input:
+ * 	- inum: symlink inumber
+ * 	- dir_node: root directory inode
+ * Returns the inumber of the file which the symlink points to or
+ * -1 if the operation is unsuccessful.
+*/
+int get_symlink_inumber(int inum, inode_t *dir_inode) {
+	inode_t *inode = inode_get(inum);
+
+	ALWAYS_ASSERT(dir_inode != NULL,
+			"get_symlink_inumber: invalid directory inode");
+	ALWAYS_ASSERT(inode != NULL,
+			"get_symlink_inumber: inode must exist");
+	ALWAYS_ASSERT(inode->i_node_type == T_SYMLINK,
+			"get_symlink_inumber: inode must represent a symlink");
+
+	int file_inumber; 
+	char const *name = (char const*)data_block_get(inode->i_data_block);
+	if ((file_inumber = fetch_file(name, dir_inode)) == ERROR_VALUE) {
+		// Original file has been deleted
+	  	return ERROR_VALUE;
+   	}
+	return file_inumber;
 }
 
 /**

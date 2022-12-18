@@ -70,33 +70,7 @@ static bool valid_pathname(char const *name) {
  * Returns the inumber of the file, -1 if unsuccessful.
  */
 static int tfs_lookup(char const *name, inode_t const *root_inode) {
-	if (!valid_pathname(name) || root_inode->i_node_type != T_DIRECTORY) {
-		return -1;
-	}
-
-	// skip the initial '/' character
-	name++;
-
-	return find_in_dir(root_inode, name);
-}
-
-int get_symlink_inumber(int inum, inode_t *dir_inode) {
-	inode_t *inode = inode_get(inum);
-
-	ALWAYS_ASSERT(dir_inode != NULL,
-			"get_symlink_inumber: invalid directory inode");
-	ALWAYS_ASSERT(inode != NULL,
-			"get_symlink_inumber: inode must exist");
-	ALWAYS_ASSERT(inode->i_node_type == T_SYMLINK,
-			"get_symlink_inumber: inode must represent a symlink");
-
-	int file_inumber; 
-	char const *name = (char const*)data_block_get(inode->i_data_block);
-	if ((file_inumber = tfs_lookup(name, dir_inode)) == ERROR_VALUE) {
-		// Original file has been deleted
-	  	return ERROR_VALUE;
-   	}
-	return file_inumber;
+	return fetch_file(name, root_inode);
 }
 
 int tfs_open(char const *name, tfs_file_mode_t mode) {
@@ -191,13 +165,13 @@ int tfs_sym_link(char const *target, char const *link_name) {
 	mutex_lock(&root_lock);
 
 	if (tfs_lookup(link_name, dir_inode) != ERROR_VALUE) {
-		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+		fprintf(stderr, "name already taken: %s\n", strerror(errno));
 		mutex_unlock(&root_lock);
 	  	return ERROR_VALUE;
    	}
 
 	if (tfs_lookup(target, dir_inode) == ERROR_VALUE) {
-		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+		fprintf(stderr, "file doesnt exist: %s\n", strerror(errno));
 		mutex_unlock(&root_lock);
 	  	return ERROR_VALUE;
    	}
@@ -208,11 +182,13 @@ int tfs_sym_link(char const *target, char const *link_name) {
 	  	return ERROR_VALUE;
 	}
 	link_inode = inode_get(link_inumber);
+	ALWAYS_ASSERT(link_inode != NULL, "tfs_sym_link: inode not found");
 	data = data_block_get(link_inode->i_data_block);
 	strcpy(data, target);
 
 	if(add_dir_entry(dir_inode, link_name + 1, link_inumber) == ERROR_VALUE) {
 		fprintf(stderr, "add directory entry error: %s\n", strerror(errno));
+		inode_delete(link_inumber);
 		mutex_unlock(&root_lock);
 	  	return ERROR_VALUE;
    	}
@@ -240,6 +216,8 @@ int tfs_link(char const *target, char const *link_name) {
    	}
 
 	target_inode = inode_get(target_inumber);
+	ALWAYS_ASSERT(target_inode != NULL,
+			"tfs_link: file inode not found");
 
 	if(target_inode->i_node_type == T_SYMLINK) {
 		fprintf(stderr, "cannot hardlink a symlink: %s\n", strerror(errno));

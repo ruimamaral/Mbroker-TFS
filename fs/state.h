@@ -55,6 +55,10 @@ int inode_create(inode_type n_type);
 void inode_delete(int inumber);
 inode_t *inode_get(int inumber);
 
+int fetch_file(char const *name, inode_t const *root_inode);
+
+int get_symlink_inumber(int inum, inode_t *dir_inode);
+
 int clear_dir_entry(inode_t *inode, char const *sub_name);
 int add_dir_entry(inode_t *inode, char const *sub_name, int sub_inumber);
 int find_in_dir(inode_t const *inode, char const *sub_name);
