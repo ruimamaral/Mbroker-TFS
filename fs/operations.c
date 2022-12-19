@@ -290,7 +290,6 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 
 			inode->i_data_block = bnum;
 		}
-
 		void *block = data_block_get(inode->i_data_block);
 		ALWAYS_ASSERT(block != NULL, "tfs_write: data block deleted mid-write");
 

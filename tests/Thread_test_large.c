@@ -12,33 +12,17 @@ int main() {
 	pthread_t tdn[1000];
 
 
+void* mega_test() {
+	int f = tfs_open(path1, TFS_O_CREAT);
+	assert(f!=-1);
+	ssize_t bytes_read;
+	char buffer[50];
+	while((bytes_read = tfs_read(f,buffer,sizeof(buffer)) > 0)){
 
-	assert(tfs_init(NULL) != -1);
-
-	void* writing_func() {
-		int f = tfs_open(path1, TFS_O_CREAT | TFS_O_TRUNC);
-		ssize_t bytes_written;
-		assert(f!=-1);
-		for(int i = 0; i < 2 ; i++){
-			if((bytes_written = tfs_write(f,text,strlen(text))) == -1){
-				assert(bytes_written != -1);
-			}
-		}
-		tfs_close(f);
-		return 0;
 	}
-
-	 void* reading_func() {
-		int f = tfs_open(path1, TFS_O_CREAT);
-		assert(f!=-1);
-		ssize_t bytes_read;
-		char buffer[50];
-		while((bytes_read = tfs_read(f,buffer,sizeof(buffer)) > 0)){
-	
-		}
-		tfs_close(f);
-		return 0;
-	}
+	tfs_close(f);
+	return 0;
+}
  
 
 	for(int i = 0 ; i< 1000; i++) {
