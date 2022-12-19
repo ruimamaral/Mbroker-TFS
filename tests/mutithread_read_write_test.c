@@ -14,7 +14,7 @@ int main() {
 
 
 	assert(tfs_init(NULL) != -1);
-
+	
 	void* writing_func() {
 		int f = tfs_open(path1, TFS_O_CREAT | TFS_O_TRUNC);
 		ssize_t bytes_written;

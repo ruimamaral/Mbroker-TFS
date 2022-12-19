@@ -1,51 +1,52 @@
 #include "fs/operations.h"
 #include <assert.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-int main() {
-    char *path1 = "/f1";
-	char *text = "ThisLine->";
-	char read_buffer[100];
-	pthread_t tdi[1000];
-	pthread_t tdn[1000];
+#define PATH_FORMAT "/f%d"
+#define FILE_COUNT 5
+#define MAX_PATH_SIZE 32
+
+char *str_ext_file = "BBB!";
+char *path_src = "tests/file_to_copy.txt";
+char buffer[40];
+char* names[50];
 
 
-void* mega_test() {
-	int f = tfs_open(path1, TFS_O_CREAT);
-	assert(f!=-1);
-	ssize_t bytes_read;
-	char buffer[50];
-	while((bytes_read = tfs_read(f,buffer,sizeof(buffer)) > 0)){
-
-	}
-	tfs_close(f);
+void* mega_test(void* name ) {
+	int f;
+	assert(tfs_copy_from_external_fs(path_src,(char*)name) != -1);
+	assert((f = tfs_open((char*)name,TFS_O_CREAT)) != -1);
+	tfs_read(f, buffer, sizeof(buffer) - 1);
+	printf("going to close %s\n", (char*)name);
+	assert(tfs_close(f) != -1);
+	tfs_unlink(name);
 	return 0;
 }
- 
 
-	for(int i = 0 ; i< 1000; i++) {
-		pthread_create(&tdn[i],NULL,&writing_func,NULL);
-		pthread_create(&tdi[i],NULL,&reading_func,NULL);
+int main() {
+    assert(tfs_init(NULL) != -1);
+	pthread_t tdn[400];
+	for(int i = 0 ; i < 50 ; i++){
+		char *name = malloc(sizeof(char)*MAX_PATH_SIZE);
+		snprintf(name, 5 , PATH_FORMAT, i);
+		names[i] = name;
 	}
 
+	for(int i = 0 ; i< 50; i++) {
 
-	for(int i = 0 ; i< 1000 ; i++){
-		pthread_join(tdi[i],NULL);
+		for(int j = 0; j < 3 ; j++){
+			pthread_create(&tdn[3*i+j],NULL,&mega_test,(void*)names[i]);
+		}
+	}	
+
+	for(int i = 0 ; i< 150 ; i++){
 		pthread_join(tdn[i],NULL);
 	}
-
-
-
-	int fa;
-	ssize_t r;
-
-	fa = tfs_open(path1, TFS_O_CREAT);
-    assert(fa != -1);
-
-	r = tfs_read(fa, read_buffer, sizeof(read_buffer)-1);
-	assert(r == strlen(text)*2);
 
 
 
