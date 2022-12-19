@@ -306,7 +306,6 @@ void inode_delete(int inumber) {
 	ALWAYS_ASSERT(freeinode_ts[inumber] == TAKEN,
 				  "inode_delete: inode already freed");
 
-	rwlock_wrlock(&inode_locks[inumber]);
 
 	if (inode_table[inumber].i_size > 0) {
 		data_block_free(inode_table[inumber].i_data_block); // TEMP maybe lock
@@ -314,7 +313,6 @@ void inode_delete(int inumber) {
 
 	freeinode_ts[inumber] = FREE;
 	mutex_unlock(&inode_table_lock);
-	rwlock_unlock(&inode_locks[inumber]);
 }
 
 /**
