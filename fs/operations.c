@@ -83,10 +83,10 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 	}
 
 	//Lock table if needed (both tables)
+	mutex_lock(&root_lock);
 	inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
 	ALWAYS_ASSERT(root_dir_inode != NULL,
 				  "tfs_open: root dir inode must exist");
-	mutex_lock(&root_lock);
 	int inum = tfs_lookup(name, root_dir_inode);
 	size_t offset;
 
