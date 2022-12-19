@@ -97,8 +97,8 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 		ALWAYS_ASSERT(inode != NULL,
 					  "tfs_open: directory files must have an inode");
 
+		int initial_inum = inum;
 		while (inode->i_node_type == T_SYMLINK) {
-			int initial_inum = inum;
 			if ((inum = get_symlink_inumber(inum,
 					root_dir_inode)) == ERROR_VALUE) {
 				rwlock_unlock(&inode_locks[initial_inum]);
@@ -110,7 +110,7 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 					"tfs_open: file inode not found");
 		}
 		if (inode->i_node_type == T_DIRECTORY) {
-			rwlock_unlock(&inode_locks[inum]);
+			rwlock_unlock(&inode_locks[initial_inum]);
 			mutex_unlock(&root_lock);
 			return ERROR_VALUE;
 		}
@@ -128,7 +128,7 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 		} else {
 			offset = 0;
 		}
-		rwlock_unlock(&inode_locks[inum]);
+		rwlock_unlock(&inode_locks[initial_inum]);
 	} else if (mode & TFS_O_CREAT) {
 		// The file does not exist; the mode specified that it should be created
 		// Create inode
