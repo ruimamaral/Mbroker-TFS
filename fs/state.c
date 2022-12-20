@@ -33,6 +33,8 @@ static char *fs_data; // # blocks * block size
 static allocation_state_t *free_blocks;
 static pthread_mutex_t dblock_lock;
 
+static pthread_mutex_t dir_lock;
+
 /*
  * Volatile FS state
  */
@@ -122,6 +124,7 @@ int state_init(tfs_params params) {
 	mutex_init(&open_file_table_mutex);
 	mutex_init(&inode_table_lock);
 	mutex_init(&dblock_lock);
+	mutex_init(&dir_lock);
 
 	for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
 		freeinode_ts[i] = FREE;
@@ -157,6 +160,8 @@ int state_destroy(void) {
 	mutex_kill(&dblock_lock);
 
 	mutex_kill(&inode_table_lock);
+
+	mutex_kill(&dir_lock);
 
 	for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
 		rwlock_kill(&inode_locks[i]);
@@ -244,6 +249,7 @@ int inode_create(inode_type i_type) {
 		mutex_unlock(&inode_table_lock);
 		return -1; // no free slots in inode table
 	}
+	rwlock_wrlock(&inode_locks[inumber]);
 	inode_t *inode = &inode_table[inumber];
 	insert_delay(); // simulate storage access delay (to inode)
 
@@ -251,6 +257,7 @@ int inode_create(inode_type i_type) {
 	switch (i_type) {
 	case T_DIRECTORY: {
 		if (inode_create_aux(inode,inumber) == ERROR_VALUE) {
+			rwlock_unlock(&inode_locks[inumber]);
 			mutex_unlock(&inode_table_lock);
 			return ERROR_VALUE;
 		} 
@@ -275,6 +282,7 @@ int inode_create(inode_type i_type) {
 		inode_table[inumber].i_data_block = -1;
 		inode->i_hard_links = 1;
 		if (inode_create_aux(inode,inumber) == ERROR_VALUE) {
+			rwlock_unlock(&inode_locks[inumber]);
 			mutex_unlock(&inode_table_lock);
 			return ERROR_VALUE;
 		} 
@@ -283,6 +291,7 @@ int inode_create(inode_type i_type) {
 		PANIC("inode_create: unknown file type");
 	}
 
+	rwlock_unlock(&inode_locks[inumber]);
 	mutex_unlock(&inode_table_lock);
 	return inumber;
 }
@@ -395,6 +404,7 @@ int clear_dir_entry(inode_t *inode, char const *sub_name) {
 	if (inode->i_node_type != T_DIRECTORY) {
 		return -1; // not a directory
 	}
+	mutex_lock(&dir_lock);
 
 	// Locates the block containing the entries of the directory
 	dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(inode->i_data_block);
@@ -405,9 +415,11 @@ int clear_dir_entry(inode_t *inode, char const *sub_name) {
 		if (!strcmp(dir_entry[i].d_name, sub_name)) {
 			dir_entry[i].d_inumber = -1;
 			memset(dir_entry[i].d_name, 0, MAX_FILE_NAME);
+			mutex_unlock(&dir_lock);
 			return 0;
 		}
 	}
+	mutex_unlock(&dir_lock);
 	return -1; // sub_name not found
 }
 
@@ -425,6 +437,7 @@ int clear_dir_entry(inode_t *inode, char const *sub_name) {
  *   - inode is not a directory inode.
  *   - sub_name is not a valid file name (length 0 or > MAX_FILE_NAME - 1).
  *   - Directory is already full of entries.
+ *	 - File with given name already exists.
  */
 int add_dir_entry(inode_t *inode, char const *sub_name, int sub_inumber) {
 	if (strlen(sub_name) == 0 || strlen(sub_name) > MAX_FILE_NAME - 1) {
@@ -432,7 +445,11 @@ int add_dir_entry(inode_t *inode, char const *sub_name, int sub_inumber) {
 	}
 
 	insert_delay(); // simulate storage access delay to inode with inumber
+
+	mutex_lock(&dir_lock);
+
 	if (inode->i_node_type != T_DIRECTORY) {
+		mutex_unlock(&dir_lock);
 		return -1; // not a directory
 	}
 
@@ -441,17 +458,27 @@ int add_dir_entry(inode_t *inode, char const *sub_name, int sub_inumber) {
 	ALWAYS_ASSERT(dir_entry != NULL,
 				  "add_dir_entry: directory must have a data block");
 
+	int index = -1;
 	// Finds and fills the first empty entry
-	for (size_t i = 0; i < MAX_DIR_ENTRIES; i++) {
-		if (dir_entry[i].d_inumber == -1) {
-			dir_entry[i].d_inumber = sub_inumber;
-			strncpy(dir_entry[i].d_name, sub_name, MAX_FILE_NAME - 1);
-			dir_entry[i].d_name[MAX_FILE_NAME - 1] = '\0';
-
-			return 0;
+	for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
+		if (dir_entry[i].d_inumber == -1 && index < 0) {
+			index = i;
+		} else if (strncmp(dir_entry[i].d_name, sub_name, MAX_FILE_NAME) == 0) {
+			// File already exists
+			mutex_unlock(&dir_lock);
+			return -1;
 		}
 	}
 
+	if (index >= 0) {
+		dir_entry[index].d_inumber = sub_inumber;
+		strncpy(dir_entry[index].d_name, sub_name, MAX_FILE_NAME - 1);
+		dir_entry[index].d_name[MAX_FILE_NAME - 1] = '\0';
+
+		mutex_unlock(&dir_lock);
+		return 0;
+	}
+	mutex_unlock(&dir_lock);
 	return -1; // no space for entry
 }
 
@@ -473,6 +500,9 @@ int find_in_dir(inode_t const *inode, char const *sub_name) {
 	ALWAYS_ASSERT(sub_name != NULL, "find_in_dir: sub_name must be non-NULL");
 
 	insert_delay(); // simulate storage access delay to inode with inumber
+
+	mutex_lock(&dir_lock);
+
 	if (inode->i_node_type != T_DIRECTORY) {
 		return -1; // not a directory
 	}
@@ -484,14 +514,17 @@ int find_in_dir(inode_t const *inode, char const *sub_name) {
 
 	// Iterates over the directory entries looking for one that has the target
 	// name
-	for (int i = 0; i < MAX_DIR_ENTRIES; i++)
+	for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
 		if ((dir_entry[i].d_inumber != -1) &&
 			(strncmp(dir_entry[i].d_name, sub_name, MAX_FILE_NAME) == 0)) {
 
 			int sub_inumber = dir_entry[i].d_inumber;
+			mutex_unlock(&dir_lock);
 			return sub_inumber;
 		}
+	}
 
+	mutex_unlock(&dir_lock);
 	return -1; // entry not found
 }
 

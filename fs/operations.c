@@ -82,8 +82,6 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 		return -1;
 	}
 
-	//Lock table if needed (both tables)
-	mutex_lock(&root_lock);
 	inode_t *root_dir_inode = inode_get(ROOT_DIR_INUM);
 	ALWAYS_ASSERT(root_dir_inode != NULL,
 				  "tfs_open: root dir inode must exist");
@@ -91,27 +89,30 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 	size_t offset;
 
 	if (inum >= 0) {
-		rwlock_wrlock(&inode_locks[inum]);
 		// The file already exists
+		rwlock_rdlock(&inode_locks[inum]);
 		inode_t *inode = inode_get(inum);
 		ALWAYS_ASSERT(inode != NULL,
 					  "tfs_open: directory files must have an inode");
 
-		int initial_inum = inum;
 		while (inode->i_node_type == T_SYMLINK) {
+			rwlock_unlock(&inode_locks[inum]);
 			if ((inum = get_symlink_inumber(inum,
 					root_dir_inode)) == ERROR_VALUE) {
-				rwlock_unlock(&inode_locks[initial_inum]);
-				mutex_unlock(&root_lock);
 				return ERROR_VALUE;
 			}
+			rwlock_rdlock(&inode_locks[inum]);
 			inode = inode_get(inum);
 			ALWAYS_ASSERT(inode != NULL,
 					"tfs_open: file inode not found");
 		}
+
+		// turn read lock into write lock
+		rwlock_unlock(&inode_locks[inum]);
+		rwlock_wrlock(&inode_locks[inum]);
+
 		if (inode->i_node_type == T_DIRECTORY) {
-			rwlock_unlock(&inode_locks[initial_inum]);
-			mutex_unlock(&root_lock);
+			rwlock_unlock(&inode_locks[inum]);
 			return ERROR_VALUE;
 		}
 		
@@ -128,13 +129,12 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 		} else {
 			offset = 0;
 		}
-		rwlock_unlock(&inode_locks[initial_inum]);
+		rwlock_unlock(&inode_locks[inum]);
 	} else if (mode & TFS_O_CREAT) {
 		// The file does not exist; the mode specified that it should be created
 		// Create inode
 		inum = inode_create(T_FILE);
 		if (inum == -1) {
-			mutex_unlock(&root_lock);
 			return -1; // no space in inode table
 		}
 
@@ -142,20 +142,17 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 		int valid = add_dir_entry(root_dir_inode, name + 1, inum);
 		if (valid == -1) {
 			inode_delete(inum);
-			mutex_unlock(&root_lock);
 			return -1; // no space in directory
 		}
 
 		offset = 0;
 	} else {
-		mutex_unlock(&root_lock);
 		return -1;
 	}
 
 	// Finally, add entry to the open file table and return the corresponding
 	// handle
 	int return_val = add_to_open_file_table(inum, offset);
-	mutex_unlock(&root_lock);
 
 	return return_val;
 
