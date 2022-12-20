@@ -22,7 +22,6 @@ void* mega_test(void* name ) {
 	assert(tfs_copy_from_external_fs(path_src,(char*)name) != -1);
 	assert((f = tfs_open((char*)name,TFS_O_CREAT)) != -1);
 	tfs_read(f, buffer, sizeof(buffer) - 1);
-	printf("going to close %s\n", (char*)name);
 	assert(tfs_close(f) != -1);
 	tfs_unlink(name);
 	return 0;

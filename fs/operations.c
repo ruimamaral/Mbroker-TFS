@@ -167,25 +167,22 @@ int tfs_sym_link(char const *target, char const *link_name) {
 	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
 	void *data;
 
-	mutex_lock(&root_lock);
-
 	if (tfs_lookup(link_name, dir_inode) != ERROR_VALUE) {
 		fprintf(stderr, "name already taken: %s\n", strerror(errno));
-		mutex_unlock(&root_lock);
 	  	return ERROR_VALUE;
    	}
 
 	if (tfs_lookup(target, dir_inode) == ERROR_VALUE) {
 		fprintf(stderr, "file doesnt exist: %s\n", strerror(errno));
-		mutex_unlock(&root_lock);
 	  	return ERROR_VALUE;
    	}
 	
 	if ((link_inumber = inode_create(T_SYMLINK)) == ERROR_VALUE) {
 		fprintf(stderr, "data block cannot be allocated: %s\n", strerror(errno));
-		mutex_unlock(&root_lock);
 	  	return ERROR_VALUE;
 	}
+	rwlock_wrlock(&inode_locks[link_inumber]);
+
 	link_inode = inode_get(link_inumber);
 	ALWAYS_ASSERT(link_inode != NULL, "tfs_sym_link: inode not found");
 	data = data_block_get(link_inode->i_data_block);
@@ -194,10 +191,10 @@ int tfs_sym_link(char const *target, char const *link_name) {
 	if(add_dir_entry(dir_inode, link_name + 1, link_inumber) == ERROR_VALUE) {
 		fprintf(stderr, "add directory entry error: %s\n", strerror(errno));
 		inode_delete(link_inumber);
-		mutex_unlock(&root_lock);
+		rwlock_unlock(&inode_locks[link_inumber]);
 	  	return ERROR_VALUE;
    	}
-	mutex_unlock(&root_lock);
+	rwlock_unlock(&inode_locks[link_inumber]);
 	return SUCCESS_VALUE;
 }
 
@@ -206,19 +203,17 @@ int tfs_link(char const *target, char const *link_name) {
 	int target_inumber;
 	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
 
-	mutex_lock(&root_lock);
-
 	if (tfs_lookup(link_name, dir_inode) != ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
-		mutex_unlock(&root_lock);
 	  	return ERROR_VALUE;
    	}
 
 	if ((target_inumber = tfs_lookup(target,dir_inode)) == ERROR_VALUE) {
 		fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
-		mutex_unlock(&root_lock);
 	  	return ERROR_VALUE;
    	}
+
+	rwlock_wrlock(&inode_locks[target_inumber]);
 
 	target_inode = inode_get(target_inumber);
 	ALWAYS_ASSERT(target_inode != NULL,
@@ -226,18 +221,18 @@ int tfs_link(char const *target, char const *link_name) {
 
 	if(target_inode->i_node_type == T_SYMLINK) {
 		fprintf(stderr, "cannot hardlink a symlink: %s\n", strerror(errno));
-		mutex_unlock(&root_lock);
+		rwlock_unlock(&inode_locks[target_inumber]);
 	  	return ERROR_VALUE;
 	}
 
 	if(add_dir_entry(dir_inode, link_name+1, target_inumber) == ERROR_VALUE) {
 		fprintf(stderr, "add directory entry error: %s\n", strerror(errno));
-		mutex_unlock(&root_lock);
+		rwlock_unlock(&inode_locks[target_inumber]);
 	  	return ERROR_VALUE;
    	}
 
 	target_inode->i_hard_links++;
-	mutex_unlock(&root_lock);
+	rwlock_unlock(&inode_locks[target_inumber]);
 	return SUCCESS_VALUE;
 }
 
