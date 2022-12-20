@@ -9,6 +9,9 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
+#define TRUE 1
+#define FALSE 0
+
 /**
  * Directory entry
  */
@@ -46,6 +49,7 @@ typedef struct {
 } open_file_entry_t;
 
 extern pthread_rwlock_t *inode_locks;
+extern pthread_rwlock_t *ftable_locks;
 
 int state_init(tfs_params);
 int state_destroy(void);
@@ -72,5 +76,7 @@ int add_to_open_file_table(int inumber, size_t offset);
 int file_is_open(int inumber);
 void remove_from_open_file_table(int fhandle);
 open_file_entry_t *get_open_file_entry(int fhandle);
+
+int close_entry(int fhandle);
 
 #endif // STATE_H
