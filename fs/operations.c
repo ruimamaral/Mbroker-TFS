@@ -346,6 +346,9 @@ int tfs_unlink(char const *target) {
 		rwlock_unlock(&inode_locks[ROOT_DIR_INUM]);
 	  	return ERROR_VALUE;
    	}
+	// Checks if file is open at that time
+	int is_open = file_is_open(target_inumber);
+
 	rwlock_wrlock(&inode_locks[target_inumber]);
 
 	target_inode = inode_get(target_inumber);
@@ -358,18 +361,17 @@ int tfs_unlink(char const *target) {
 	}
 
 	type = target_inode->i_node_type;
-	int hardlinks = --target_inode->i_hard_links;
 
 	if (type == T_SYMLINK) {
 		inode_delete(target_inumber);
 	} else {
-		if (file_is_open(target_inumber) == TRUE){
-			fprintf(stderr, "directory lookup error: %s\n", strerror(errno));
+		// If file was open, return -1
+		if (is_open) {
 			rwlock_unlock(&inode_locks[target_inumber]);
 			rwlock_unlock(&inode_locks[ROOT_DIR_INUM]);
 	  		return ERROR_VALUE;
 		}
-		if (hardlinks == 0) {
+		if (--target_inode->i_hard_links == 0) {
 			inode_delete(target_inumber);
 		}
 	}

@@ -9,6 +9,9 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
+#define TRUE 1
+#define FALSE 0
+
 /**
  * Directory entry
  */
