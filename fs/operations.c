@@ -158,6 +158,9 @@ int tfs_open(char const *name, tfs_file_mode_t mode) {
 	// opened but it remains created
 }
 
+/* 
+ * Creates a hardlink from a file.
+ */
 int tfs_sym_link(char const *target, char const *link_name) {
 	inode_t *link_inode;
 	int link_inumber;
@@ -185,39 +188,34 @@ int tfs_sym_link(char const *target, char const *link_name) {
 	return 0;
 }
 
+/* 
+ * Creates a symbolic link from a file.
+ */
 int tfs_link(char const *target, char const *link_name) {
 	inode_t *target_inode;
 	int target_inumber;
 	inode_t *dir_inode = inode_get(ROOT_DIR_INUM);
 
 	rwlock_rdlock(&inode_locks[ROOT_DIR_INUM]);
-	if (tfs_lookup(link_name, dir_inode) != -1) {
-		rwlock_unlock(&inode_locks[ROOT_DIR_INUM]);
-	  	return -1;
-   	}
 
 	if ((target_inumber = tfs_lookup(target,dir_inode)) == -1) {
 		rwlock_unlock(&inode_locks[ROOT_DIR_INUM]);
 	  	return -1;
    	}
 
-	rwlock_rdlock(&inode_locks[target_inumber]);
+	rwlock_wrlock(&inode_locks[target_inumber]);
 
 	target_inode = inode_get(target_inumber);
 	ALWAYS_ASSERT(target_inode != NULL,
 			"tfs_link: file inode not found");
 
-	if(target_inode->i_node_type == T_SYMLINK) {
+	if(target_inode->i_node_type == T_SYMLINK
+		|| add_dir_entry(dir_inode, link_name+1, target_inumber) == -1) {
+
 		rwlock_unlock(&inode_locks[target_inumber]);
 		rwlock_unlock(&inode_locks[ROOT_DIR_INUM]);
 	  	return -1;
 	}
-
-	if(add_dir_entry(dir_inode, link_name+1, target_inumber) == -1) {
-		rwlock_unlock(&inode_locks[target_inumber]);
-		rwlock_unlock(&inode_locks[ROOT_DIR_INUM]);
-	  	return -1;
-   	}
 
 	target_inode->i_hard_links++;
 	rwlock_unlock(&inode_locks[target_inumber]);
@@ -239,7 +237,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 
 	int inumber = file->of_inumber;
 
-	//  From the open file table entry, we get the inode
+	// From the open file table entry, we get the inode
 	inode_t *inode = inode_get(inumber);
 	ALWAYS_ASSERT(inode != NULL, "tfs_write: inode of open file deleted");
 	// Lock after verifying that the inumber is valid
@@ -281,6 +279,9 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 	return (ssize_t)to_write;
 }
 
+/* 
+ * Reads bytes from a file in tfs.
+ */
 ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 	// Lock so that file isnt closed mid read
 	rwlock_rdlock(&ftable_locks[fhandle]);
@@ -317,6 +318,9 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 	return (ssize_t)to_read;
 }
 
+/* 
+ * Destroys a link in tfs.
+ */
 int tfs_unlink(char const *target) {
 	inode_t* dir_inode = inode_get(ROOT_DIR_INUM);
 	inode_t* target_inode;
@@ -365,6 +369,9 @@ int tfs_unlink(char const *target) {
 	return 0;
 }
 
+/* 
+ * Imports a file and its contents from the actual file system into tfs.
+ */
 int tfs_copy_from_external_fs(char const *source_path, char const *dest_path) {
 	size_t bytes_read;
 	ssize_t bytes_written;

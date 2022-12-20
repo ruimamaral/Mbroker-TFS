@@ -567,7 +567,9 @@ void data_block_free(int block_number) {
 
 	insert_delay(); // simulate storage access delay to free_blocks
 
+	mutex_lock(&dblock_lock);
 	free_blocks[block_number] = FREE;
+	mutex_unlock(&dblock_lock);
 }
 
 /**
@@ -617,6 +619,14 @@ int add_to_open_file_table(int inumber, size_t offset) {
 }
 
 
+/**
+ * Checks wether a given file is open.
+ *
+ * Input:
+ *   - inumber: inode number of the file to open
+ *
+ * Returns 1 if the file is open, 0 otherwise.
+ */
 int file_is_open(int inumber) {
 	mutex_lock(&open_file_table_mutex);
 	for (int i = 0; i < MAX_OPEN_FILES; i++) {

@@ -44,6 +44,7 @@ void* hardlinks_func(void* j ) {
 
 
 int main() {
+	printf("Test takes a while...\n");
 	tfs_params params = tfs_test_params();
 	assert(tfs_init(&params) != -1);
 	pthread_t tdn[100];
