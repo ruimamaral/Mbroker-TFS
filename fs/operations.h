@@ -4,12 +4,10 @@
 #include "config.h"
 #include <sys/types.h>
 
-#define ERROR_VALUE -1
-#define SUCCESS_VALUE 0
 #define TRUE 1
 #define FALSE 0
 #define BUFFER_SIZE 8
-#define MEMSET_VALUE SUCCESS_VALUE
+#define MEMSET_VALUE 0
 
 /**
  * TécnicoFS parameters.

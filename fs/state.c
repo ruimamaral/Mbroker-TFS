@@ -219,11 +219,11 @@ int inode_create_aux(inode_t* inode,int inumber) {
 
 		// run regular deletion process
 		inode_delete(inumber);
-		return ERROR_VALUE;
+		return -1;
 	}
 	inode_table[inumber].i_size = BLOCK_SIZE;
 	inode_table[inumber].i_data_block = b;
-	return SUCCESS_VALUE;
+	return 0;
 }
 
 
@@ -257,9 +257,9 @@ int inode_create(inode_type i_type) {
 	inode->i_node_type = i_type;
 	switch (i_type) {
 	case T_DIRECTORY: {
-		if (inode_create_aux(inode,inumber) == ERROR_VALUE) {
+		if (inode_create_aux(inode,inumber) == -1) {
 			mutex_unlock(&inode_table_lock);
-			return ERROR_VALUE;
+			return -1;
 		} 
 		int b = inode->i_data_block;
 		dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(b);
@@ -281,9 +281,9 @@ int inode_create(inode_type i_type) {
 		inode_table[inumber].i_size = 0;
 		inode_table[inumber].i_data_block = -1;
 		inode->i_hard_links = 1;
-		if (inode_create_aux(inode,inumber) == ERROR_VALUE) {
+		if (inode_create_aux(inode,inumber) == -1) {
 			mutex_unlock(&inode_table_lock);
-			return ERROR_VALUE;
+			return -1;
 		} 
 		break;
 	default:
@@ -377,9 +377,9 @@ int get_symlink_inumber(int inum, inode_t *dir_inode) {
 
 	int file_inumber; 
 	char const *name = (char const*)data_block_get(inode->i_data_block);
-	if ((file_inumber = fetch_file(name, dir_inode)) == ERROR_VALUE) {
+	if ((file_inumber = fetch_file(name, dir_inode)) == -1) {
 		// Original file has been deleted
-	  	return ERROR_VALUE;
+	  	return -1;
    	}
 	return file_inumber;
 }
