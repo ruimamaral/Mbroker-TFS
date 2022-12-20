@@ -662,10 +662,31 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
 	mutex_lock(&open_file_table_mutex);
 
 	if (free_open_file_entries[fhandle] != TAKEN) {
+		mutex_unlock(&open_file_table_mutex);
 		return NULL;
 	}
 	open_file_entry_t *return_val = &open_file_table[fhandle];
 
 	mutex_unlock(&open_file_table_mutex);
 	return return_val;
+}
+
+int close_entry(int fhandle) {
+
+	mutex_lock(&open_file_table_mutex);
+	
+	open_file_entry_t *file = get_open_file_entry(fhandle);
+	if (file == NULL) {
+		mutex_unlock(&open_file_table_mutex);
+		return -1; // invalid fd
+	}
+	// TEMP Prevents file being closed mid read/write
+	// rwlock_wrlock(file->of_inumber);
+
+	remove_from_open_file_table(fhandle);
+
+	// rwlock_unlock(file->of_inumber);
+
+	mutex_unlock(&open_file_table_mutex);
+	return 0;
 }

@@ -73,4 +73,6 @@ int file_is_open(int inumber);
 void remove_from_open_file_table(int fhandle);
 open_file_entry_t *get_open_file_entry(int fhandle);
 
+int close_entry(int fhandle);
+
 #endif // STATE_H
