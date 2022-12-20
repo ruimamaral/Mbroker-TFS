@@ -20,7 +20,7 @@ char *path_src = "tests/file_to_copy.txt";
 
 tfs_params tfs_test_params() {
     tfs_params params = {
-        .max_inode_count = 64,
+        .max_inode_count = 300,
         .max_block_count = 1024,
         .max_open_files_count = MAX_OPEN_FILES,
         .block_size = 1000000,

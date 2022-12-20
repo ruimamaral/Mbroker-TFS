@@ -165,6 +165,7 @@ int tfs_sym_link(char const *target, char const *link_name) {
 	void *data;
 	
 	if ((link_inumber = inode_create(T_SYMLINK)) == -1) {
+		printf("creation error\n");
 	  	return -1;
 	}
 	rwlock_wrlock(&inode_locks[link_inumber]);
@@ -177,6 +178,7 @@ int tfs_sym_link(char const *target, char const *link_name) {
 	if(add_dir_entry(dir_inode, link_name + 1, link_inumber) == -1) {
 		inode_delete(link_inumber);
 		rwlock_unlock(&inode_locks[link_inumber]);
+		printf("add dir error\n");
 	  	return -1;
    	}
 	rwlock_unlock(&inode_locks[link_inumber]);

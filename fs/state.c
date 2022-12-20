@@ -249,6 +249,7 @@ int inode_create(inode_type i_type) {
 	int inumber = inode_alloc();
 	if (inumber == -1) {
 		mutex_unlock(&inode_table_lock);
+		printf("no space\n");
 		return -1; // no free slots in inode table
 	}
 	inode_t *inode = &inode_table[inumber];
@@ -259,6 +260,7 @@ int inode_create(inode_type i_type) {
 	case T_DIRECTORY: {
 		if (inode_create_aux(inode,inumber) == -1) {
 			mutex_unlock(&inode_table_lock);
+			printf("aux\n");
 			return -1;
 		} 
 		int b = inode->i_data_block;
@@ -283,6 +285,7 @@ int inode_create(inode_type i_type) {
 		inode->i_hard_links = 1;
 		if (inode_create_aux(inode,inumber) == -1) {
 			mutex_unlock(&inode_table_lock);
+			printf("aux sym\n");
 			return -1;
 		} 
 		break;
