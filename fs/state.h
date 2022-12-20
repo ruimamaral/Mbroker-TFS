@@ -43,6 +43,7 @@ typedef enum { LOCK, UNLOCK } lock_mode;
 typedef struct {
 	int of_inumber;
 	size_t of_offset;
+	pthread_rwlock_t of_lock;
 } open_file_entry_t;
 
 extern pthread_rwlock_t *inode_locks;

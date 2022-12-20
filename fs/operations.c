@@ -11,9 +11,6 @@
 
 #include "betterassert.h"
 
-// Locks functionalities that involve creating new files
-static pthread_mutex_t root_lock;
-
 tfs_params tfs_default_params() {
 	tfs_params params = {
 		.max_inode_count = 64,
@@ -41,7 +38,6 @@ int tfs_init(tfs_params const *params_ptr) {
 	if (root != ROOT_DIR_INUM) {
 		return -1;
 	}
-	mutex_init(&root_lock);
 
 	return 0;
 }
@@ -247,18 +243,7 @@ int tfs_link(char const *target, char const *link_name) {
 }
 
 int tfs_close(int fhandle) {
-	open_file_entry_t *file = get_open_file_entry(fhandle);
-	if (file == NULL) {
-		return -1; // invalid fd
-	}
-	// TEMP Prevents file being closed mid read/write
-	// rwlock_wrlock(file->of_inumber);
-
-	remove_from_open_file_table(fhandle);
-
-	// rwlock_unlock(file->of_inumber);
-
-	return 0;
+	return close_entry(fhandle);
 }
 
 ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
@@ -266,6 +251,8 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 	if (file == NULL) {
 		return -1;
 	}
+
+	rwlock_rdlock(&file->of_lock);
 
 	int inumber = file->of_inumber;
 
@@ -286,6 +273,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 			// If empty file, allocate new block
 			int bnum = data_block_alloc();
 			if (bnum == -1) {
+				rwlock_unlock(&file->of_lock);
 				rwlock_unlock(&inode_locks[inumber]);
 				return -1; // no space
 			}
@@ -305,6 +293,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 		}
 	}
 
+	rwlock_unlock(&file->of_lock);
 	rwlock_unlock(&inode_locks[inumber]);
 	return (ssize_t)to_write;
 }
@@ -314,6 +303,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 	if (file == NULL) {
 		return -1;
 	}
+	rwlock_rdlock(&file->of_lock);
 	int inumber = file->of_inumber;
 
 	// From the open file table entry, we get the inode
@@ -338,6 +328,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 		file->of_offset += to_read;
 	}
 
+	rwlock_unlock(&file->of_lock);
 	rwlock_unlock(&inode_locks[inumber]);
 	return (ssize_t)to_read;
 }

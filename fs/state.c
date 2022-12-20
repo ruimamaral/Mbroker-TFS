@@ -137,6 +137,7 @@ int state_init(tfs_params params) {
 
 	for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
 		free_open_file_entries[i] = FREE;
+		rwlock_init(&open_file_table[i].of_lock);
 	}
 
 	return 0;
@@ -148,6 +149,18 @@ int state_init(tfs_params params) {
  * Returns 0 if succesful, -1 otherwise.
  */
 int state_destroy(void) {
+	for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
+		rwlock_kill(&open_file_table[i].of_lock);
+	}
+	for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
+		rwlock_kill(&inode_locks[i]);
+	}
+	mutex_kill(&open_file_table_mutex);
+	mutex_kill(&dblock_lock);
+	mutex_kill(&inode_table_lock);
+	mutex_kill(&dir_lock);
+
+	free(inode_locks);
 	free(inode_table);
 	free(freeinode_ts);
 	free(fs_data);
@@ -155,20 +168,7 @@ int state_destroy(void) {
 	free(open_file_table);
 	free(free_open_file_entries);
 
-	mutex_kill(&open_file_table_mutex);
-
-	mutex_kill(&dblock_lock);
-
-	mutex_kill(&inode_table_lock);
-
-	mutex_kill(&dir_lock);
-
-	for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
-		rwlock_kill(&inode_locks[i]);
-	}
-	free(inode_locks);
 	inode_locks = NULL;
-
 	inode_table = NULL;
 	freeinode_ts = NULL;
 	fs_data = NULL;
@@ -602,9 +602,10 @@ int add_to_open_file_table(int inumber, size_t offset) {
 	for (int i = 0; i < MAX_OPEN_FILES; i++) {
 		if (free_open_file_entries[i] == FREE) {
 			free_open_file_entries[i] = TAKEN;
+			rwlock_wrlock(&open_file_table[i].of_lock);
 			open_file_table[i].of_inumber = inumber;
 			open_file_table[i].of_offset = offset;
-
+			rwlock_unlock(&open_file_table[i].of_lock);
 			mutex_unlock(&open_file_table_mutex);
 			return i;
 		}
@@ -680,13 +681,10 @@ int close_entry(int fhandle) {
 		mutex_unlock(&open_file_table_mutex);
 		return -1; // invalid fd
 	}
-	// TEMP Prevents file being closed mid read/write
-	// rwlock_wrlock(file->of_inumber);
-
+	// Prevents file being closed mid read/write
+	rwlock_wrlock(&file->of_lock);
 	remove_from_open_file_table(fhandle);
-
-	// rwlock_unlock(file->of_inumber);
-
+	rwlock_unlock(&file->of_lock);
 	mutex_unlock(&open_file_table_mutex);
 	return 0;
 }
