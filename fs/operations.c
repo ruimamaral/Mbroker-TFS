@@ -247,12 +247,12 @@ int tfs_close(int fhandle) {
 }
 
 ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
+	// Lock so that file isnt closed mid write
+	rwlock_rdlock(&ftable_locks[fhandle]);
 	open_file_entry_t *file = get_open_file_entry(fhandle);
 	if (file == NULL) {
 		return -1;
 	}
-
-	rwlock_rdlock(&file->of_lock);
 
 	int inumber = file->of_inumber;
 
@@ -273,7 +273,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 			// If empty file, allocate new block
 			int bnum = data_block_alloc();
 			if (bnum == -1) {
-				rwlock_unlock(&file->of_lock);
+				rwlock_unlock(&ftable_locks[fhandle]);
 				rwlock_unlock(&inode_locks[inumber]);
 				return -1; // no space
 			}
@@ -293,17 +293,18 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
 		}
 	}
 
-	rwlock_unlock(&file->of_lock);
+	rwlock_unlock(&ftable_locks[fhandle]);
 	rwlock_unlock(&inode_locks[inumber]);
 	return (ssize_t)to_write;
 }
 
 ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
+	// Lock so that file isnt closed mid read
+	rwlock_rdlock(&ftable_locks[fhandle]);
 	open_file_entry_t *file = get_open_file_entry(fhandle);
 	if (file == NULL) {
 		return -1;
 	}
-	rwlock_rdlock(&file->of_lock);
 	int inumber = file->of_inumber;
 
 	// From the open file table entry, we get the inode
@@ -328,7 +329,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 		file->of_offset += to_read;
 	}
 
-	rwlock_unlock(&file->of_lock);
+	rwlock_unlock(&ftable_locks[fhandle]);
 	rwlock_unlock(&inode_locks[inumber]);
 	return (ssize_t)to_read;
 }

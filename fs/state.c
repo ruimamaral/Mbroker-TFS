@@ -41,6 +41,7 @@ static pthread_mutex_t dir_lock;
 static open_file_entry_t *open_file_table;
 static allocation_state_t *free_open_file_entries;
 static pthread_mutex_t open_file_table_mutex;
+pthread_rwlock_t *ftable_locks;
 
 static inline bool valid_inumber(int inumber) {
 	return inumber >= 0 && inumber < INODE_TABLE_SIZE;
@@ -107,6 +108,7 @@ int state_init(tfs_params params) {
 	}
 
 	inode_locks = malloc(INODE_TABLE_SIZE * sizeof(pthread_rwlock_t));
+	ftable_locks = malloc(MAX_OPEN_FILES * sizeof(pthread_rwlock_t));
 	inode_table = malloc(INODE_TABLE_SIZE * sizeof(inode_t));
 	freeinode_ts = malloc(INODE_TABLE_SIZE * sizeof(allocation_state_t));
 	fs_data = malloc(DATA_BLOCKS * BLOCK_SIZE);
@@ -137,7 +139,7 @@ int state_init(tfs_params params) {
 
 	for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
 		free_open_file_entries[i] = FREE;
-		rwlock_init(&open_file_table[i].of_lock);
+		rwlock_init(&ftable_locks[i]);
 	}
 
 	return 0;
@@ -150,7 +152,7 @@ int state_init(tfs_params params) {
  */
 int state_destroy(void) {
 	for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
-		rwlock_kill(&open_file_table[i].of_lock);
+		rwlock_kill(&ftable_locks[i]);
 	}
 	for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
 		rwlock_kill(&inode_locks[i]);
@@ -598,10 +600,10 @@ int add_to_open_file_table(int inumber, size_t offset) {
 	for (int i = 0; i < MAX_OPEN_FILES; i++) {
 		if (free_open_file_entries[i] == FREE) {
 			free_open_file_entries[i] = TAKEN;
-			rwlock_wrlock(&open_file_table[i].of_lock);
+			rwlock_wrlock(&ftable_locks[i]);
 			open_file_table[i].of_inumber = inumber;
 			open_file_table[i].of_offset = offset;
-			rwlock_unlock(&open_file_table[i].of_lock);
+			rwlock_unlock(&ftable_locks[i]);
 			mutex_unlock(&open_file_table_mutex);
 			return i;
 		}
@@ -674,9 +676,9 @@ int close_entry(int fhandle) {
 		return -1; // invalid fd
 	}
 	// Prevents file being closed mid read/write
-	rwlock_wrlock(&file->of_lock);
+	rwlock_wrlock(&ftable_locks[fhandle]);
 	remove_from_open_file_table(fhandle);
-	rwlock_unlock(&file->of_lock);
+	rwlock_unlock(&ftable_locks[fhandle]);
 	mutex_unlock(&open_file_table_mutex);
 	return 0;
 }
