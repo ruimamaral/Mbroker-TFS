@@ -43,7 +43,7 @@ accept_register(char* pipe_name) {
 			return -1;
 	}
 	while(true) {
-		ssize_t ret = read(server_pipe, ,);
+		ssize_t ret = read(server_pipe, , sizeof(u_int8_t));
 		switch(code) {
 			case:>"1" 
 
