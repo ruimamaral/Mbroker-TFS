@@ -1,4 +1,5 @@
 #include "logging.h"
+#include "pipeutils.h"
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -7,100 +8,116 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdint.h>
 
-#define MESSAGE_MAX 1024
-
-void requestcpy(void *request, size_t *request_offset, void *data,
-                size_t size) {
-    memcpy(request + *request_offset, data, size);
-    *request_offset += size;
+void destroy(char *pipe_name, int fd, int rp_fd) {
+	close(fd);
+	close(rp_fd);
+    unlink(pipe_name);
 }
 
-int send_request(char **argv) {
-    int pd;
-    u_int8_t code = 1;
-    size_t request_offset = 0;
-    char request[289];
-    if ((pd = open(argv[1], O_WRONLY)) == -1) {
-        return -1;
-    }
-    memset(request, 0, sizeof(request));
-    requestcpy(request, &request_offset, &code, sizeof(u_int8_t));
-    requestcpy(request, &request_offset, argv[1], sizeof(char) * 256);
-    requestcpy(request, &request_offset, argv[2], sizeof(char) * 32);
+void process_messages(int fd) {
+	char buf[MAX_MSG_LENGTH];
+	int len = 0;
+	char c;
 
-    ssize_t ret = write(pd, request, sizeof(request));
-    if (ret < 0) {
+	memset(buf, 0, MAX_MSG_LENGTH);
+
+	while (true) {
+		while ((c = getchar()) != '\n') {
+			if (c == EOF) {
+				return;
+			}
+			if (len >= MAX_MSG_LENGTH - 1) {
+				// Truncate text
+				while ((c = getchar()) != '\n') {
+					if (c == EOF) {
+						return;
+					}
+				}
+				break;
+			}
+			buf[len++] = c;
+		}
+		memset(buf, 0, MAX_MSG_LENGTH);
+		len = 0;
+		if (send_request(fd, publish_request(buf)) <= 0) { // TEMP check if needed
+			return;
+		}
+	}
+}
+
+char *publish_request(char *message) {
+	size_t request_len = sizeof(uint8_t) + MAX_MSG_LENGTH * sizeof(char);
+
+	char request = myalloc(request_len);
+	memset(request, 0, request_len);
+	uint8_t code = PUBLISH_CODE;
+	size_t request_offset = 0;
+
+    requestcpy(request, &request_offset, &code, sizeof(uint8_t));
+    requestcpy(request, &request_offset,
+			message, MAX_MSG_LENGTH * sizeof(char));
+	return request;
+
+}
+
+char *creation_request(char *pipe_name, char *box_name) {
+	size_t request_len = sizeof(uint8_t)
+			+ (BOX_NAME_LENGTH + CLIENT_PIPE_LENGTH) * sizeof(char);
+
+	char request = myalloc(request_len);
+	memset(request, 0, request_len);
+	uint8_t code = PUB_CREATION_CODE;
+	size_t request_offset = 0;
+
+    requestcpy(request, &request_offset, &code, sizeof(uint8_t));
+    requestcpy(request, &request_offset,
+			pipe_name, CLIENT_PIPE_LENGTH * sizeof(char));
+    requestcpy(request, &request_offset,
+			box_name, BOX_NAME_LENGTH * sizeof(char));
+	return request;
+}
+
+int main(int argc, char **argv) {
+	int rp_fd;
+	int fd;
+	char* pipe_name = argv[2];
+    if (argc != 4) {
+        printf("sai1\n");
         return -1;
     }
-    close(pd);
+
+    if ((rp_fd = open(argv[1], O_WRONLY)) == -1) {
+        return -1;
+    }
+
+    if (mkfifo(pipe_name, 0777) == -1) {
+		close(rp_fd);
+        printf("sai3\n");
+        return -1;
+    }
+
+    if (send_request(rp_fd, creation_request(pipe_name, argv[3])) != 0 ) {
+		close(rp_fd);
+		unlink(pipe_name);
+        printf("Unable to send request to server\n");
+        return -1;
+    }
+
+	// Waits for pipe to be opened server-side
+	if ((fd = open(pipe_name, O_WRONLY)) == -1) {
+		close(rp_fd);
+		unlink(pipe_name);
+        printf("Cannot open client pipe\n");
+		return -1;
+	}
+
+	process_messages(fd);
+
+	destroy(pipe_name, fd, rp_fd);
+
+	printf("Publisher terminated.");
+
     return 0;
 }
-
-int read_msg(char *client_pipe) {
-    int cp;
-    int character;
-    ssize_t ret;
-    int counter = 0;
-    ret = 0;
-
-    if ((cp = open(client_pipe, O_WRONLY)) == -1) {
-        return -1;
-    }
-
-    char message[1024];
-
-    while (true) {
-        character = getchar();
-
-        if (counter <= MESSAGE_MAX) {
-            if (counter == MESSAGE_MAX) {
-                message[MESSAGE_MAX - 1] = 0;
-			
-            } else if (character == '\n' || character == EOF ||
-                       counter <= MESSAGE_MAX) {
-
-                if (counter < MESSAGE_MAX) {
-                    message[counter] = character;
-                } else if (counter == MESSAGE_MAX) {
-                    message[MESSAGE_MAX - 1] = 0;
-                }
-
-                counter++;
-                ret = write(cp, message, sizeof(message));
-                if (ret < 0) {
-                    return -1;
-                } else if (ret = 0) {
-                    break;
-                }
-                memset(message, 0, sizeof(message));
-            }
-        }
-        close(cp);
-        return 0;
-    }
-
-    int main(int argc, char **argv) {
-        if (argc != 4) {
-            printf("sai1\n");
-            return -1;
-        }
-
-        unlink(argv[2]);
-
-        if (mkfifo(argv[2], 0777) == -1) {
-            printf("sai3\n");
-            return -1;
-        }
-
-        /* if(send_request(argv) != 0 ) {
-                printf("sai4\n");
-                return -1;
-        } */
-        if (send_msg(argv[2]) != 0) {
-            printf("sai5\n");
-            return -1;
-        }
-
-        return 0;
-    }
