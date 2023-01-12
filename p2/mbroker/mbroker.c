@@ -16,46 +16,48 @@
 box *server_boxes;
 pc_queue_t *queue;
 
-int listen_for_requests(char* pipe_name) {
+void listen_for_requests(char* pipe_name) {
 	int dummy_pipe;
 	int server_pipe;
 	char client_pipe[CLIENT_PIPE_LENGTH];
 	uint8_t code;
-	session ses;
+	session *ses;
 	if ((server_pipe = open(pipe_name, O_RDONLY)) == -1) {
-		return -1;
+		PANIC("Cannot open register pipe.")
 	}
+	// Dummy pipe makes sure that there will always be at least
+	// one write-end for the register pipe.
 	if ((dummy_pipe = open(pipe_name, O_WRONLY)) == -1) {
-			return -1;
+		PANIC("Cannot open dummy pipe - aborting.")
 	}
 	while(true) {
-		read_pipe(server_pipe, &ses.code, sizeof(uint8_t));
-		read_pipe(server_pipe, ses.pipe_name,
+		ses = (session*) myalloc(sizeof(session));
+		read_pipe(server_pipe, &ses->code, sizeof(uint8_t));
+		read_pipe(server_pipe, ses->pipe_name,
 				sizeof(char) * CLIENT_PIPE_LENGTH);
 
-		switch(ses.code) {
+		switch(ses->code) {
 			case 7:
+				// List boxes request (doesn't have box_name parameter)
 				break;
 
 			case 1:
 			case 2:
 			case 3:
 			case 5:
-				read_pipe(server_pipe, ses.box_name,
+				read_pipe(server_pipe, ses->box_name,
 						sizeof(char) * MAX_BOX_NAME);
 				break;
+
 			default:
 				// Invalid code.
-				return -1;
+				PANIC("Invalid code read by server.")
 		}
 
 		// Signal to workers.
-		/* pcq_enqueue(queue, session); */
+		/* pcq_enqueue(queue, &session); */
 	}
-	return 0;
 } 
-
-
 
 int main(int argc, char **argv) {
 	/* int i; */
@@ -68,12 +70,10 @@ int main(int argc, char **argv) {
 	unlink(argv[1]);
 	
 	if(mkfifo(argv[1], 0777) == -1){
-		return -1;
+		PANIC("Cannot create register pipe.")
 	}
 
-	if(listen_for_requests(argv[1]) == -1 ){
-		return -1;
-	}
+	listen_for_requests(argv[1]);
 
 	return 0;
 	/*
@@ -90,14 +90,22 @@ int main(int argc, char **argv) {
 	*/
 } 
 
-/*
-void process_sessions() {
-	// Waits for queue to not be empty
-	session current = pcq_dequeue(queue);
+void handle_register_publisher(session *current) {
 
-	switch (current.code) {
+}
+
+void process_sessions() {
+	while (true) {
+		// If queue is empty, waits for a producer signal.
+		session *current = (session*) pcq_dequeue(queue);
+
 		// Pick handler function for each type of session
+		switch (current->code) {
+			case 1:
+				handle_register_publisher(current);
+			default:
+				PANIC("Invalid code reached worker thread.")
+		}
+		free(current);
 	}
 }
-*/
-

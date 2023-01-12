@@ -37,17 +37,22 @@ int pcq_destroy(pc_queue_t *queue) {
 //
 // If the queue is full, sleep until the queue has space
 int pcq_enqueue(pc_queue_t *queue, void *elem) {
-	mutex_lock(queue->pcq_current_size_lock);
-	mutex_unlock(queue->pcq_pusher_condvar_lock);
+	// Lock does not allow two pushers running at the same time.
+	mutex_lock(queue->pcq_pusher_condvar_lock);
 	if (queue->pcq_current_size == queue->pcq_capacity) {
-		// Queue is full
+		// Queue is full, so wait unti an element gets popped
 		cond_wait(queue->pcq_pusher_condvar, queue->pcq_pusher_condvar_lock);
 	}
+	mutex_lock(queue->pcq_current_size_lock);
+	queue->pcq_current_size++;
+	mutex_unlock(queue->pcq_current_size_lock);
+
+	cond_signal(queue->pcq_popper_condvar);
+
 	queue->pcq_buffer[queue->pcq_tail] = elem;
 	queue->pcq_tail = (queue->pcq_tail + 1) % queue->pcq_capacity;
-	queue->pcq_current_size++;
+
 	mutex_unlock(queue->pcq_pusher_condvar_lock);
-	mutex_unlock(queue->pcq_current_size_lock);
 	return 0;
 }
 
@@ -55,16 +60,21 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
 //
 // If the queue is empty, sleep until the queue has an element
 void *pcq_dequeue(pc_queue_t *queue) {
-	mutex_lock(queue->pcq_current_size_lock);
+	// Lock does not allow two poppers running at the same time.
 	mutex_lock(queue->pcq_popper_condvar_lock);
 	if (queue->pcq_current_size == 0) {
 		// Queue is empty, so wait until an element gets pushed
 		cond_wait(queue->pcq_popper_condvar, queue->pcq_popper_condvar_lock);
 	}
+	mutex_lock(queue->pcq_current_size_lock);
+	queue->pcq_current_size--;
+	mutex_unlock(queue->pcq_current_size_lock);
+
+	cond_signal(queue->pcq_pusher_condvar);
+
 	void *ret queue->pcq_buffer[queue->pcq_head];
 	queue->pcq_head = (queue->pcq_head + 1) % queue->pcq_capacity;
-	queue->pcq_current_size--;
+
 	mutex_unlock(queue->pcq_popper_condvar_lock);
-	mutex_unlock(queue->pcq_current_size_lock);
 	return ret;
 }
