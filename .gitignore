@@ -1,7 +1,7 @@
-mbroker/mbroker
-manager/manager
-publisher/pub
-subscriber/sub
+p2/mbroker/mbroker
+p2/manager/manager
+p2/publisher/pub
+p2/subscriber/sub
 
 # Prerequisites
 *.d

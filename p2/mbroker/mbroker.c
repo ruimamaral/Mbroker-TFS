@@ -13,36 +13,39 @@
 #include <sys/stat.h>
 #include <pthread.h>
 
-Box *server_boxes;
+box *server_boxes;
 pc_queue_t *queue;
-
-
 
 int listen_for_requests(char* pipe_name) {
 	int dummy_pipe;
 	int server_pipe;
-	char client_pipe[256];
+	char client_pipe[CLIENT_PIPE_LENGTH];
 	uint8_t code;
-	/* session session; */
-	if((server_pipe = open(pipe_name, O_RDONLY)) == -1 ){
+	session ses;
+	if ((server_pipe = open(pipe_name, O_RDONLY)) == -1) {
 		return -1;
 	}
-	if((dummy_pipe = open(pipe_name, O_WRONLY)) == -1 ){
+	if ((dummy_pipe = open(pipe_name, O_WRONLY)) == -1) {
 			return -1;
 	}
 	while(true) {
-		ssize_t ret = read_pipe(server_pipe, &code,sizeof(uint8_t));
-		printf("ret->%zu||code->%d\n",ret,(int)code);
-		switch(code) {
+		read_pipe(server_pipe, &ses.code, sizeof(uint8_t));
+		read_pipe(server_pipe, ses.pipe_name,
+				sizeof(char) * CLIENT_PIPE_LENGTH);
+
+		switch(ses.code) {
+			case 7:
+				break;
+
 			case 1:
-				ret = read_pipe(server_pipe,client_pipe,sizeof(char)*CLIENT_PIPE_LENGTH);
-				printf("%s\n",client_pipe);
-				char box_name[32];
-				ret = read_pipe(server_pipe,box_name,sizeof(char)*BOX_NAME_LENGTH);
-				printf("%s\n",box_name);
-				// fill in session variable
+			case 2:
+			case 3:
+			case 5:
+				read_pipe(server_pipe, ses.box_name,
+						sizeof(char) * MAX_BOX_NAME);
 				break;
 			default:
+				// Invalid code.
 				return -1;
 		}
 
@@ -68,12 +71,9 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-
-
 	if(listen_for_requests(argv[1]) == -1 ){
 		return -1;
 	}
-
 
 	return 0;
 	/*
@@ -85,7 +85,9 @@ int main(int argc, char **argv) {
 		pthread_create(&worker_threads[i], NULL, &process_sessions, NULL);
 	} 
 
-	listen_for_requests(argv[1]); */
+	listen_for_requests(argv[1]);
+	return 0;
+	*/
 } 
 
 /*

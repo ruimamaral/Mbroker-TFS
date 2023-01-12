@@ -46,7 +46,7 @@ void process_messages(int fd) {
 			}
 			if (len >= MAX_MSG_LENGTH - 1) {
 				// Truncate text
-				while ((c = (char)getchar()) != '\n') {
+				while ((c = (char) getchar()) != '\n') {
 					if (c == EOF) {
 						return;
 					}
@@ -62,8 +62,6 @@ void process_messages(int fd) {
 		}
 	}
 }
-
-
 
 void *creation_request(char *pipe_name, char *box_name) {
 	printf("entrei\n");
@@ -102,7 +100,8 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    if (send_request(rp_fd, creation_request(pipe_name, argv[3]),REQUEST_PUBLISH_LEN) == -1 ) {
+    if (send_request(rp_fd,
+			creation_request(pipe_name, argv[3]), REQUEST_PUBLISH_LEN) == -1 ) {
 		close(rp_fd);
 		unlink(pipe_name);
         printf("Unable to send request to server\n");

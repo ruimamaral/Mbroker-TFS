@@ -11,13 +11,13 @@ typedef struct {
 	char path[MAX_BOX_NAME];
 	int n_subs;
 	int n_publishers;
-} Box;
+} box;
 
 typedef struct {
 	uint8_t code;
 	char *box_name;
 	char *pipe_name;
-} Session;
+} session;
 
 
 #endif
