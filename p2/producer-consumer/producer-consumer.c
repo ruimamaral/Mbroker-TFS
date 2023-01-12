@@ -38,21 +38,21 @@ int pcq_destroy(pc_queue_t *queue) {
 // If the queue is full, sleep until the queue has space
 int pcq_enqueue(pc_queue_t *queue, void *elem) {
 	// Lock does not allow two pushers running at the same time.
-	mutex_lock(queue->pcq_pusher_condvar_lock);
+	mutex_lock(&queue->pcq_pusher_condvar_lock);
 	if (queue->pcq_current_size == queue->pcq_capacity) {
 		// Queue is full, so wait unti an element gets popped
-		cond_wait(queue->pcq_pusher_condvar, queue->pcq_pusher_condvar_lock);
+		cond_wait(&queue->pcq_pusher_condvar, &queue->pcq_pusher_condvar_lock);
 	}
-	mutex_lock(queue->pcq_current_size_lock);
+	mutex_lock(&queue->pcq_current_size_lock);
 	queue->pcq_current_size++;
-	mutex_unlock(queue->pcq_current_size_lock);
+	mutex_unlock(&queue->pcq_current_size_lock);
 
-	cond_signal(queue->pcq_popper_condvar);
+	cond_signal(&queue->pcq_popper_condvar);
 
 	queue->pcq_buffer[queue->pcq_tail] = elem;
 	queue->pcq_tail = (queue->pcq_tail + 1) % queue->pcq_capacity;
 
-	mutex_unlock(queue->pcq_pusher_condvar_lock);
+	mutex_unlock(&queue->pcq_pusher_condvar_lock);
 	return 0;
 }
 
@@ -61,20 +61,20 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
 // If the queue is empty, sleep until the queue has an element
 void *pcq_dequeue(pc_queue_t *queue) {
 	// Lock does not allow two poppers running at the same time.
-	mutex_lock(queue->pcq_popper_condvar_lock);
+	mutex_lock(&queue->pcq_popper_condvar_lock);
 	if (queue->pcq_current_size == 0) {
 		// Queue is empty, so wait until an element gets pushed
-		cond_wait(queue->pcq_popper_condvar, queue->pcq_popper_condvar_lock);
+		cond_wait(&queue->pcq_popper_condvar, &queue->pcq_popper_condvar_lock);
 	}
-	mutex_lock(queue->pcq_current_size_lock);
+	mutex_lock(&queue->pcq_current_size_lock);
 	queue->pcq_current_size--;
-	mutex_unlock(queue->pcq_current_size_lock);
+	mutex_unlock(&queue->pcq_current_size_lock);
 
-	cond_signal(queue->pcq_pusher_condvar);
+	cond_signal(&queue->pcq_pusher_condvar);
 
-	void *ret queue->pcq_buffer[queue->pcq_head];
+	void *ret = queue->pcq_buffer[queue->pcq_head];
 	queue->pcq_head = (queue->pcq_head + 1) % queue->pcq_capacity;
 
-	mutex_unlock(queue->pcq_popper_condvar_lock);
+	mutex_unlock(&queue->pcq_popper_condvar_lock);
 	return ret;
 }
