@@ -4,6 +4,7 @@
 #include "betterassert.h"
 #include "producer-consumer.h"
 #include "pipeutils.h"
+#include "locks.h"
 #include "data.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +30,7 @@ void listen_for_requests(char* pipe_name) {
 		PANIC("Cannot open dummy pipe - aborting.")
 	}
 	while(true) {
-		ses = (session*) myalloc(sizeof(session));
+		ses = (session_t*) myalloc(sizeof(session_t));
 		read_pipe(server_pipe, &ses->code, sizeof(uint8_t));
 		read_pipe(server_pipe, ses->pipe_name,
 				sizeof(char) * CLIENT_PIPE_LENGTH);
@@ -67,7 +68,7 @@ int main(int argc, char **argv) {
 	
 	ALWAYS_ASSERT(mkfifo(argv[1], 0777) != -1, "Cannot create register pipe");
 
-	ALWAYS_ASSERT(!tfs_init(), "Cannot initialize tfs.");
+	ALWAYS_ASSERT(!tfs_init(NULL), "Cannot initialize tfs.");
 
 	listen_for_requests(argv[1]);
 
@@ -86,7 +87,7 @@ int main(int argc, char **argv) {
 	*/
 } 
 
-int handle_register_publisher(session *current) {
+int handle_register_publisher(session_t *current) {
 	box_t *box;
 	int cp_fd;
 	int tfs_fd;
@@ -105,26 +106,45 @@ int handle_register_publisher(session *current) {
 	if ((tfs_fd = tfs_open(current->box_name, TFS_O_APPEND)))
 	while (true) {
 		uint8_t code;
-		int ret;
+		ssize_t ret;
 		char message[MAX_MSG_LENGTH];
-		read_pipe(cp_fd, &code, sizeof(u_int8_t));
+		ret = read_pipe(cp_fd, &code, sizeof(u_int8_t));
 
+		if( ret == 0) {
+			if(close(cp_fd) == -1) {
+				if(tfs_close(tfs_fd) == -1) {return-1;}
+				return -1;
+			}
+			if(tfs_close(tfs_fd) == -1) {return -1;}
+			break;
+		}
 		ALWAYS_ASSERT(code == PUBLISH_CODE,
 				"Invalid code received by worker thread.");
 
-		read_pipe(cp_fd, message, sizeof(char) * MAX_MSG_LENGTH);
+		ret = read_pipe(cp_fd, message, sizeof(char) * MAX_MSG_LENGTH);
 
-		tfs_write(tfs_fd, message, MAX_MSG_LENGTH);
+		if( ret == 0) {
+			if(close(cp_fd) == -1) {
+				if(tfs_close(tfs_fd) == -1) {return-1;}
+				return -1;
+			}
+			if(tfs_close(tfs_fd) == -1) {return -1;}
+			break;
+		}
 
+		if(tfs_write(tfs_fd, message, MAX_MSG_LENGTH) == -1) {
+			return -1;
+		}
 		// Signal subs
-		cond_signal(box->condvar);
+		cond_signal(&box->condvar);
 	}
+	return 0;
 }
 
 void process_sessions() {
 	while (true) {
 		// If queue is empty, waits for a producer signal.
-		session *current = (session*) pcq_dequeue(queue);
+		session_t *current = (session_t*) pcq_dequeue(queue);
 
 		// Pick handler function for each type of session
 		switch (current->code) {

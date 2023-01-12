@@ -9,9 +9,10 @@ pc_queue_t *queue;
 
 int data_init() {
 	server_boxes = (box_t**) myalloc(sizeof(box_t*) * DEFAULT_BOX_LIMIT);
-	queue = (pcq_queue_t*) myalloc(sizeof(pcq_queue_t));
+	queue = (pc_queue_t*) myalloc(sizeof(pc_queue_t*));
 	pcq_create(queue, DEFAULT_QUEUE_LENGTH);
 	memset(server_boxes, 0, DEFAULT_BOX_LIMIT);
+	return 0;
 }
 
 box_t *fetch_box(char *name) {
@@ -25,7 +26,7 @@ box_t *fetch_box(char *name) {
 int find_box(char *name) {
 	int i;
 	for (i = 0; i < DEFAULT_BOX_LIMIT; i++) {
-		box_t box* = server_boxes[i];
+		box_t *box = server_boxes[i];
 		if (box && !strcmp(box->name, name)) {
 			return i;
 		}
@@ -33,6 +34,6 @@ int find_box(char *name) {
 	return -1;
 }
 
-box_t* create_box(char *name) {
+/* box_t* create_box(char *name) {
 	int i = 0;
-}
+} */
