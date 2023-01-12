@@ -11,12 +11,13 @@
 #include "betterassert.h"
 
 int main(int argc, char **argv) {
-	int i;
+	/* int i; */
     if( argc == 2 ) {
 		return -1;
 	}
-	ALWAYS_ASSERT((int)argv[2] > 0,"Invalid session number\n");
-	pthread_t worker_threads[(int)argv[2]];
+	int box_number = atoi (argv[2]);
+	ALWAYS_ASSERT(box_number> 0,"Invalid session number\n");
+	/* pthread_t worker_threads[box_number]; */
 	unlink(argv[1]);
 
 	if( mkfifo( argv[1],0777 ) == -1 ){
@@ -27,12 +28,12 @@ int main(int argc, char **argv) {
 		pthread_create(&worker_threads[0],NULL,&process_session,NULL);
 	} */
 
-	init_queue();
-	accept_register(argv[1]);
+	/* init_queue();
+	accept_register(argv[1]); */
 }
 
 
-accept_register(char* pipe_name) {
+/* accept_register(char* pipe_name) {
 	int dummy_pipe;
 	int server_pipe;
 	ssize_t rest_of_message= 0;
@@ -49,4 +50,4 @@ accept_register(char* pipe_name) {
 
 		}
 	}
-}
+} */

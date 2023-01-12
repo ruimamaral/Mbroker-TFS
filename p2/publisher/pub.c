@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
 	int fd;
 	char* pipe_name = argv[2];
     if (argc != 4) {
-        printf("sai1\n");
+        printf("Number of input arguments is incorrect\n");
         return -1;
     }
 
@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
 
     if (mkfifo(pipe_name, 0777) == -1) {
 		close(rp_fd);
-        printf("sai3\n");
+        printf("Unable to send create client pipe\n");
         return -1;
     }
 
