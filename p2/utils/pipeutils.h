@@ -20,7 +20,7 @@ ssize_t write_pipe(int fd, char const *buf);
 
 ssize_t read_pipe(int fd, char const *buf);
 
-ssize_t send_request(int fd, char buf);
+ssize_t send_request(int fd, char* buf);
 
 void *myalloc(size_t size);
 

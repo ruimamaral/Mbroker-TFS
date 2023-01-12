@@ -16,12 +16,29 @@ void destroy(char *pipe_name, int fd, int rp_fd) {
     unlink(pipe_name);
 }
 
-void process_messages(int fd) {
-	char buf[MAX_MSG_LENGTH];
-	int len = 0;
-	char c;
 
-	memset(buf, 0, MAX_MSG_LENGTH);
+
+char *publish_request(char *message) {
+	size_t request_len = sizeof(uint8_t) + MAX_MSG_LENGTH * sizeof(char);
+
+	char* request = (char*) myalloc(request_len);
+	memset(request, 0, request_len);
+	uint8_t code = PUBLISH_CODE;
+	size_t request_offset = 0;
+
+    requestcpy(request, &request_offset, &code, sizeof(uint8_t));
+    requestcpy(request, &request_offset,
+			message, MAX_MSG_LENGTH * sizeof(char));
+	return request;
+
+}
+
+void process_messages(int fd) {
+	char buffer[MAX_MSG_LENGTH];
+	int len = 0;
+	int_least32_t c;
+
+	memset(buffer, 0, MAX_MSG_LENGTH);
 
 	while (true) {
 		while ((c = getchar()) != '\n') {
@@ -37,36 +54,23 @@ void process_messages(int fd) {
 				}
 				break;
 			}
-			buf[len++] = c;
+			buffer[len++] = (char)c;
 		}
-		memset(buf, 0, MAX_MSG_LENGTH);
+		memset(buffer, 0, MAX_MSG_LENGTH);
 		len = 0;
-		if (send_request(fd, publish_request(buf)) <= 0) { // TEMP check if needed
+		if (send_request(fd, publish_request(buffer)) <= 0) { // TEMP check if needed
 			return;
 		}
 	}
 }
 
-char *publish_request(char *message) {
-	size_t request_len = sizeof(uint8_t) + MAX_MSG_LENGTH * sizeof(char);
 
-	char request = (char*) myalloc(request_len);
-	memset(request, 0, request_len);
-	uint8_t code = PUBLISH_CODE;
-	size_t request_offset = 0;
-
-    requestcpy(request, &request_offset, &code, sizeof(uint8_t));
-    requestcpy(request, &request_offset,
-			message, MAX_MSG_LENGTH * sizeof(char));
-	return request;
-
-}
 
 char *creation_request(char *pipe_name, char *box_name) {
 	size_t request_len = sizeof(uint8_t)
 			+ (BOX_NAME_LENGTH + CLIENT_PIPE_LENGTH) * sizeof(char);
 
-	char request = (char*) myalloc(request_len);
+	char* request = (char*) myalloc(request_len);
 	memset(request, 0, request_len);
 	uint8_t code = PUB_CREATION_CODE;
 	size_t request_offset = 0;

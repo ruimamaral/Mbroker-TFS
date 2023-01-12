@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 #include <pthread.h>
 
-box *server_boxes;
+Box *server_boxes;
 pc_queue_t *queue;
 
 int main(int argc, char **argv) {
