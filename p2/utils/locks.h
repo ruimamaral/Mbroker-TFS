@@ -20,5 +20,4 @@ void cond_signal(pthread_cond_t *cond);
 void cond_broadcast(pthread_cond_t *cond);
 void cond_kill(pthread_cond_t *cond);
 
-
 #endif

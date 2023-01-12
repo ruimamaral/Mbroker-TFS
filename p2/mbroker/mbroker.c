@@ -1,8 +1,10 @@
+#include "operations.h"
 #include "logging.h"
 #include "mbroker.h"
 #include "betterassert.h"
 #include "producer-consumer.h"
 #include "pipeutils.h"
+#include "data.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,13 +15,11 @@
 #include <sys/stat.h>
 #include <pthread.h>
 
-box *server_boxes;
-pc_queue_t *queue;
 
 void listen_for_requests(char* pipe_name) {
 	int dummy_pipe;
 	int server_pipe;
-	session *ses;
+	session_t *ses;
 	if ((server_pipe = open(pipe_name, O_RDONLY)) == -1) {
 		PANIC("Cannot open register pipe.")
 	}
@@ -58,18 +58,16 @@ void listen_for_requests(char* pipe_name) {
 } 
 
 int main(int argc, char **argv) {
-	/* int i; */
-    if(argc == 2) {
-		return -1;
-	}
+    ALWAYS_ASSERT(argc == 2, "Invalid arguments.");
+
 	int max_sessions = atoi(argv[2]);
 	ALWAYS_ASSERT(max_sessions > 0, "Invalid session number\n");
 	/* pthread_t worker_threads[max_sessions]; */
 	unlink(argv[1]);
 	
-	if(mkfifo(argv[1], 0777) == -1){
-		PANIC("Cannot create register pipe.")
-	}
+	ALWAYS_ASSERT(mkfifo(argv[1], 0777) != -1, "Cannot create register pipe");
+
+	ALWAYS_ASSERT(!tfs_init(), "Cannot initialize tfs.");
 
 	listen_for_requests(argv[1]);
 
@@ -77,7 +75,7 @@ int main(int argc, char **argv) {
 	/*
 	boxes = (box*) myalloc(sizeof(box) * max_boxes);
 	queue = (pc_queue_t*) myalloc(sizeof(pc_queue_t));
-	pcq_create(queue);
+	pcq_create(queue, QUEUE_LENGTH);
 
 	for(i = 0; i < argv[2]; i++) {
 		pthread_create(&worker_threads[i], NULL, &process_sessions, NULL);
@@ -88,10 +86,41 @@ int main(int argc, char **argv) {
 	*/
 } 
 
-/* void handle_register_publisher(session *current) {
-	
+int handle_register_publisher(session *current) {
+	box_t *box;
+	int cp_fd;
+	int tfs_fd;
+	if ((cp_fd = open(current->pipe_name, O_RDONLY)) == -1) {
+		return -1;
+	}
+	if ((box = fetch_box(current->box_name)) == 0) {
+		close(cp_fd);
+		return -1;
+	}
+	if (box->n_publishers > 0) {
+		close(cp_fd);
+		return -1;
+	}
+
+	if ((tfs_fd = tfs_open(current->box_name, TFS_O_APPEND)))
+	while (true) {
+		uint8_t code;
+		int ret;
+		char message[MAX_MSG_LENGTH];
+		read_pipe(cp_fd, &code, sizeof(u_int8_t));
+
+		ALWAYS_ASSERT(code == PUBLISH_CODE,
+				"Invalid code received by worker thread.");
+
+		read_pipe(cp_fd, message, sizeof(char) * MAX_MSG_LENGTH);
+
+		tfs_write(tfs_fd, message, MAX_MSG_LENGTH);
+
+		// Signal subs
+		cond_signal(box->condvar);
+	}
 }
- */
+
 void process_sessions() {
 	while (true) {
 		// If queue is empty, waits for a producer signal.
