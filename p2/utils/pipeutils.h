@@ -3,6 +3,7 @@
 
 #include "logging.h"
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #define MAX_MSG_LENGTH 1024
@@ -11,16 +12,17 @@
 #define PUB_CREATION_CODE 1
 #define BOX_NAME_LENGTH 32
 #define CLIENT_PIPE_LENGTH 256
+#define REQUEST_PUBLISH_LEN (PUB_CREATION_CODE*sizeof(uint8_t) + CLIENT_PIPE_LENGTH*sizeof(char) + BOX_NAME_LENGTH*sizeof(char))
 
 
 void requestcpy(void *request,
 		size_t *request_offset, void *data, size_t size);
 
-ssize_t write_pipe(int fd, char const *buffer);
+ssize_t write_pipe(int fd, void const *buffer,size_t buffer_size);
 
-ssize_t read_pipe(int fd, char const *buffer);
+ssize_t read_pipe(int fd, void const *buffer,size_t buffer_size);
 
-ssize_t send_request(int fd, char* buffer);
+ssize_t send_request(int fd, void* buffer,size_t buffer_size);
 
 void *myalloc(size_t size);
 
