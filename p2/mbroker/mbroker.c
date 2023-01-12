@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
 	if(mkfifo(argv[1], 0777) == -1){
 		return -1;
 	}
-
+	
 	/*
 	boxes = (box*) myalloc(sizeof(box) * max_boxes);
 	queue = (pc_queue_t*) myalloc(sizeof(pc_queue_t));
