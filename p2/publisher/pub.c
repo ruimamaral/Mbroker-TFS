@@ -50,7 +50,7 @@ void process_messages(int fd) {
 char *publish_request(char *message) {
 	size_t request_len = sizeof(uint8_t) + MAX_MSG_LENGTH * sizeof(char);
 
-	char request = myalloc(request_len);
+	char request = (char*) myalloc(request_len);
 	memset(request, 0, request_len);
 	uint8_t code = PUBLISH_CODE;
 	size_t request_offset = 0;
@@ -66,7 +66,7 @@ char *creation_request(char *pipe_name, char *box_name) {
 	size_t request_len = sizeof(uint8_t)
 			+ (BOX_NAME_LENGTH + CLIENT_PIPE_LENGTH) * sizeof(char);
 
-	char request = myalloc(request_len);
+	char request = (char*) myalloc(request_len);
 	memset(request, 0, request_len);
 	uint8_t code = PUB_CREATION_CODE;
 	size_t request_offset = 0;

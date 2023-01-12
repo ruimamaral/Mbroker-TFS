@@ -13,8 +13,8 @@ void requestcpy(void *request,
 	*request_offset += size;
 }
 
-ssize_t write_pipe(int fd, char const *buf) {
-    size_t len = strlen(buf);
+ssize_t write_pipe(int fd, void const *buf) {
+    size_t len = sizeof(buf);
     size_t written = 0;
 
     while (written < len) {
@@ -26,8 +26,8 @@ ssize_t write_pipe(int fd, char const *buf) {
 	return written;
 }
 
-ssize_t read_pipe(int fd, char const *buf) {
-    size_t len = strlen(buf);
+ssize_t read_pipe(int fd, void const *buf) {
+    size_t len = sizeof(buf);
     ssize_t ret = read(fd, buf, len - 1);
 	ALWAYS_ASSERT(ret >= 0, "read from pipe failed");
 

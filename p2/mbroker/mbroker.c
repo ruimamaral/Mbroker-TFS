@@ -1,4 +1,8 @@
 #include "logging.h"
+#include "mbroker.h"
+#include "betterassert.h"
+#include "producer-consumer.h"
+#include "pipeutils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,35 +12,51 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <pthread.h>
-#include "betterassert.h"
+
+box *server_boxes;
+pc_queue_t *queue;
 
 int main(int argc, char **argv) {
 	/* int i; */
-    if( argc == 2 ) {
+    if(argc == 2) {
 		return -1;
 	}
-	int box_number = atoi (argv[2]);
-	ALWAYS_ASSERT(box_number> 0,"Invalid session number\n");
-	/* pthread_t worker_threads[box_number]; */
+	int max_sessions = atoi(argv[2]);
+	ALWAYS_ASSERT(max_sessions > 0, "Invalid session number\n");
+	/* pthread_t worker_threads[max_sessions]; */
 	unlink(argv[1]);
 
-	if( mkfifo( argv[1],0777 ) == -1 ){
+	if(mkfifo(argv[1], 0777) == -1){
 		return -1;
 	}
 
-	/* for( i = 0; i < argv[2] ; i++) {
-		pthread_create(&worker_threads[0],NULL,&process_session,NULL);
-	} */
+	/*
+	boxes = (box*) myalloc(sizeof(box) * max_boxes);
+	queue = (pc_queue_t*) myalloc(sizeof(pc_queue_t));
+	pcq_create(queue);
 
-	/* init_queue();
-	accept_register(argv[1]); */
+	for(i = 0; i < argv[2]; i++) {
+		pthread_create(&worker_threads[i], NULL, &process_sessions, NULL);
+	} 
+
+	listen_for_requests(argv[1]); */
+} 
+
+/*
+void process_sessions() {
+	// Waits for queue to not be empty
+	session current = pcq_dequeue(queue);
+
+	switch (current.code) {
+		// Pick handler function for each type of session
+	}
 }
 
-
-/* accept_register(char* pipe_name) {
+void listen_for_requests(char* pipe_name) {
 	int dummy_pipe;
 	int server_pipe;
-	ssize_t rest_of_message= 0;
+	uint8_t code;
+	session session;
 	if((server_pipe = open(pipe_name, O_RDONLY)) == -1 ){
 		return -1;
 	}
@@ -44,10 +64,14 @@ int main(int argc, char **argv) {
 			return -1;
 	}
 	while(true) {
-		ssize_t ret = read(server_pipe, , sizeof(u_int8_t));
+		ssize_t ret = read_pipe(server_pipe, &code);
 		switch(code) {
-			case:>"1" 
-
+			case 1:
+				// fill in session variable
+				break;
 		}
+		// Signal to workers.
+		pcq_enqueue(queue, session);
 	}
-} */
+}  */
+

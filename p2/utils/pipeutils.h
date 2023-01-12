@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #define MAX_MSG_LENGTH 1024
+#define MAX_BOX_NAME 32
 #define PUBLISH_CODE 9
 #define PUB_CREATION_CODE 1
 #define BOX_NAME_LENGTH 32
