@@ -15,7 +15,7 @@ void requestcpy(void *request,
 
 ssize_t write_pipe(int fd, void const *buffer, size_t buffer_size) {
 	printf("escrita1\n");
-	ssize_t written;
+	ssize_t written = 0;
 	// Keeps trying to write if the pipe is full
 	while (written < buffer_size) {
     	ssize_t ret = write(fd, buffer, buffer_size);

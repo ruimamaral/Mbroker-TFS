@@ -14,4 +14,11 @@ void rwlock_wrlock(pthread_rwlock_t *rwlock);
 void rwlock_unlock(pthread_rwlock_t *rwlock);
 void rwlock_kill(pthread_rwlock_t *rwlock);
 
+void cond_init(pthread_cond_t *cond);
+void cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
+void cond_signal(pthread_cond_t *cond);
+void cond_broadcast(pthread_cond_t *cond);
+void cond_kill(pthread_cond_t *cond);
+
+
 #endif

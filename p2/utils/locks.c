@@ -52,17 +52,17 @@ void rwlock_kill(pthread_rwlock_t *rwlock) {
 }
 // Cond vars
 void cond_init(pthread_cond_t *cond) {
-	ALWAYS_ASSERT(pthread_cond_init(cond) == 0, "cond_init fail");
+	ALWAYS_ASSERT(pthread_cond_init(cond,NULL) == 0, "cond_init fail");
 }
 void cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex) {
 	ALWAYS_ASSERT(pthread_cond_wait(cond, mutex) == 0, "cond_wait fail");
 }
-void cond_signal(pthread_cond_t *cond, pthread_mutex_t *mutex) {
-	ALWAYS_ASSERT(pthread_cond_signal(cond, mutex) == 0, "cond_signal fail");
+void cond_signal(pthread_cond_t *cond) {
+	ALWAYS_ASSERT(pthread_cond_signal(cond) == 0, "cond_signal fail");
 }
-void cond_broadcast(pthread_cond_t *cond, pthread_mutex_t *mutex) {
+void cond_broadcast(pthread_cond_t *cond) {
 	ALWAYS_ASSERT(pthread_cond_broadcast(
-			cond, mutex) == 0, "cond_broadcast fail");
+			cond) == 0, "cond_broadcast fail");
 }
 void cond_kill(pthread_cond_t *cond) {
 	ALWAYS_ASSERT(pthread_cond_destroy(cond) == 0, "cond_destroy fail");

@@ -19,8 +19,6 @@ pc_queue_t *queue;
 void listen_for_requests(char* pipe_name) {
 	int dummy_pipe;
 	int server_pipe;
-	char client_pipe[CLIENT_PIPE_LENGTH];
-	uint8_t code;
 	session *ses;
 	if ((server_pipe = open(pipe_name, O_RDONLY)) == -1) {
 		PANIC("Cannot open register pipe.")
@@ -90,10 +88,10 @@ int main(int argc, char **argv) {
 	*/
 } 
 
-void handle_register_publisher(session *current) {
-
+/* void handle_register_publisher(session *current) {
+	
 }
-
+ */
 void process_sessions() {
 	while (true) {
 		// If queue is empty, waits for a producer signal.
@@ -102,7 +100,7 @@ void process_sessions() {
 		// Pick handler function for each type of session
 		switch (current->code) {
 			case 1:
-				handle_register_publisher(current);
+				/* handle_register_publisher(current); */
 			default:
 				PANIC("Invalid code reached worker thread.")
 		}
