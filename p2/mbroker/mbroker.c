@@ -98,46 +98,68 @@ int handle_register_publisher(session_t *current) {
 		close(cp_fd);
 		return -1;
 	}
-	if (box->n_publishers > 0) {
+	if ((tfs_fd = tfs_open(current->box_name, TFS_O_APPEND)) == -1) {
 		close(cp_fd);
 		return -1;
 	}
+	mutex_lock(&box->content_mutex);
+	if (box->n_publishers > 0) {
+		close(cp_fd);
+		tfs_close(tfs_fd);
+		mutex_unlock(&box->content_mutex);
+		return -1;
+	}
+	if (box->status == CLOSED) {
+		close(cp_fd);
+		tfs_close(tfs_fd);
+		mutex_unlock(&box->content_mutex);
+		return -1;
+	}
 
-	if ((tfs_fd = tfs_open(current->box_name, TFS_O_APPEND)))
+	box->n_publishers++;
+	box->pub_pipe_name = current->pipe_name;
+	mutex_unlock(&box->content_mutex);
+
 	while (true) {
 		uint8_t code;
 		ssize_t ret;
 		char message[MAX_MSG_LENGTH];
 		ret = read_pipe(cp_fd, &code, sizeof(u_int8_t));
+		mutex_lock(&box->content_mutex);
+		if (box->status == CLOSED) {
+			// Signals manager worker thread that is waiting for
+			// publishers and subscribers to terminate their sessions.
+			cond_signal(&box->condvar);
+			mutex_unlock(&box->content_mutex);
+			break;
+		}
 
-		if( ret == 0) {
-			if(close(cp_fd) == -1) {
-				if(tfs_close(tfs_fd) == -1) {return-1;}
-				return -1;
-			}
-			if(tfs_close(tfs_fd) == -1) {return -1;}
+		// Pipe closed
+		if (ret == 0) {
 			break;
 		}
 		ALWAYS_ASSERT(code == PUBLISH_CODE,
 				"Invalid code received by worker thread.");
 
 		ret = read_pipe(cp_fd, message, sizeof(char) * MAX_MSG_LENGTH);
-
-		if( ret == 0) {
-			if(close(cp_fd) == -1) {
-				if(tfs_close(tfs_fd) == -1) {return-1;}
-				return -1;
-			}
-			if(tfs_close(tfs_fd) == -1) {return -1;}
+		// Pipe closed
+		if (ret == 0) {
 			break;
 		}
 
-		if(tfs_write(tfs_fd, message, MAX_MSG_LENGTH) == -1) {
-			return -1;
+		ret = tfs_write(tfs_fd, message, MAX_MSG_LENGTH);
+		ALWAYS_ASSERT(ret != -1, "tfs_write failed");
+		if (ret < MAX_MSG_LENGTH) {
+			// TEMP se tiver a dar erro aqui e so por tudo na mesma linha para dar fix
+			INFO("Box has ran out of
+					space, no further messages will be sent!");
 		}
 		// Signal subs
 		cond_signal(&box->condvar);
 	}
+	close(cp_fd);
+	tfs_close(tfs_fd);
+	decrease_box_pubs(box);
 	return 0;
 }
 
@@ -150,8 +172,9 @@ void process_sessions() {
 		switch (current->code) {
 			case 1:
 				/* handle_register_publisher(current); */
+				break;
 			default:
-				PANIC("Invalid code reached worker thread.")
+				PANIC("Invalid code reached worker thread.");
 		}
 		free(current);
 	}

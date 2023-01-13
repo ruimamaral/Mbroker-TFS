@@ -43,10 +43,15 @@ int pcq_create(pc_queue_t *queue, size_t capacity) {
 int pcq_enqueue(pc_queue_t *queue, void *elem) {
 	// Lock does not allow two pushers running at the same time.
 	mutex_lock(&queue->pcq_pusher_condvar_lock);
+	//mutex_lock(&queue->pcq_current_size_lock);
 	if (queue->pcq_current_size == queue->pcq_capacity) {
-		// Queue is full, so wait unti an element gets popped
+		//mutex_unlock(&queue->pcq_current_size_lock);
+
+		// Queue is full, so wait until an element gets popped
 		cond_wait(&queue->pcq_pusher_condvar, &queue->pcq_pusher_condvar_lock);
+		//mutex_lock(&queue->pcq_current_size_lock);
 	}
+	//mutex_unlock(&queue->pcq_current_size_lock);
 	mutex_lock(&queue->pcq_current_size_lock);
 	queue->pcq_current_size++;
 	mutex_unlock(&queue->pcq_current_size_lock);

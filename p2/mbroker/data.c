@@ -1,5 +1,6 @@
 #include "data.h"
 #include "producer-consumer.h"
+#include "locks.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,3 +38,15 @@ int find_box(char *name) {
 /* box_t* create_box(char *name) {
 	int i = 0;
 } */
+
+void decrease_box_subs(box_t* box) {
+	mutex_lock(&box->content_mutex);
+	box->n_subscribers--;
+	mutex_unlock(&box->content_mutex);
+}
+
+void decrease_box_pubs(box_t* box) {
+	mutex_lock(&box->content_mutex);
+	box->n_publishers--;
+	mutex_unlock(&box->content_mutex);
+}
