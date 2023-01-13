@@ -18,17 +18,18 @@ void destroy(char *pipe_name, int fd, int rp_fd) {
 
 
 
-char *publish_request(char *message) {
+void *publish_request(char *message) {
+	printf("entrei no publish\n");
 	size_t request_len = sizeof(uint8_t) + MAX_MSG_LENGTH * sizeof(char);
 
-	char* request = (char*) myalloc(request_len);
-	memset(request, 0, REQUEST_PUBLISH_LEN);
+	void* request = (void*) myalloc(request_len);
+	memset(request, 0, request_len);
 	uint8_t code = PUBLISH_CODE;
 	size_t request_offset = 0;
 
     requestcpy(request, &request_offset, &code, sizeof(uint8_t));
     requestcpy(request, &request_offset,
-			message, MAX_MSG_LENGTH * sizeof(char));
+		message, MAX_MSG_LENGTH * sizeof(char));
 	return request;
 
 }
@@ -42,7 +43,7 @@ void process_messages(int fd) {
 	while (true) {
 		while ((c = (char)getchar()) != '\n') {
 			if (c == EOF) {
-				return;
+				break;
 			}
 			if (len >= MAX_MSG_LENGTH - 1) {
 				// Truncate text
@@ -55,11 +56,17 @@ void process_messages(int fd) {
 			}
 			buffer[len++] = c;
 		}
-		memset(buffer, 0, MAX_MSG_LENGTH);
+		printf("what\n");
 		len = 0;
 		if (send_request(fd, publish_request(buffer),MAX_MSG_LENGTH) <= 0) { // TEMP check if needed
 			return;
 		}
+		printf("MESSAGE_SENT[%s]\n",buffer);
+		if (c == EOF) {
+			break;
+		}
+		memset(buffer, 0, MAX_MSG_LENGTH);
+		
 	}
 }
 
@@ -89,6 +96,8 @@ int main(int argc, char **argv) {
         printf("Number of input arguments is incorrect\n");
         return -1;
     }
+
+	unlink(pipe_name);
 
 	if (mkfifo(pipe_name, 0777) == -1) {
         printf("Unable to send create client pipe\n");

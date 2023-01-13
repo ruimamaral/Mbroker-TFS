@@ -21,20 +21,22 @@ void listen_for_requests(char* pipe_name) {
 	int dummy_pipe;
 	int server_pipe;
 	session_t *ses;
+
 	if ((server_pipe = open(pipe_name, O_RDONLY)) == -1) {
 		PANIC("Cannot open register pipe.")
 	}
+
 	// Dummy pipe makes sure that there will always be at least
 	// one write-end for the register pipe.
 	if ((dummy_pipe = open(pipe_name, O_WRONLY)) == -1) {
 		PANIC("Cannot open dummy pipe - aborting.")
 	}
+
+
 	while(true) {
 		ses = (session_t*) myalloc(sizeof(session_t));
 		read_pipe(server_pipe, &ses->code, sizeof(uint8_t));
-		read_pipe(server_pipe, ses->pipe_name,
-				sizeof(char) * CLIENT_PIPE_LENGTH);
-
+		read_pipe(server_pipe, ses->pipe_name,sizeof(char) * CLIENT_PIPE_LENGTH);
 		switch(ses->code) {
 			case 7:
 				// List boxes request (doesn't have box_name parameter)
@@ -46,6 +48,7 @@ void listen_for_requests(char* pipe_name) {
 			case 5:
 				read_pipe(server_pipe, ses->box_name,
 						sizeof(char) * MAX_BOX_NAME);
+				handle_register_publisher(ses);
 				break;
 
 			default:
@@ -59,8 +62,7 @@ void listen_for_requests(char* pipe_name) {
 } 
 
 int main(int argc, char **argv) {
-    ALWAYS_ASSERT(argc == 2, "Invalid arguments.");
-
+    ALWAYS_ASSERT(argc == 3, "Invalid arguments.");
 	int max_sessions = atoi(argv[2]);
 	ALWAYS_ASSERT(max_sessions > 0, "Invalid session number\n");
 	/* pthread_t worker_threads[max_sessions]; */
@@ -70,27 +72,25 @@ int main(int argc, char **argv) {
 
 	ALWAYS_ASSERT(!tfs_init(NULL), "Cannot initialize tfs.");
 
-	listen_for_requests(argv[1]);
-
-	return 0;
-	/*
-	boxes = (box*) myalloc(sizeof(box) * max_boxes);
+	server_boxes = (box_t**) myalloc(sizeof(box_t**) * 200 );
 	queue = (pc_queue_t*) myalloc(sizeof(pc_queue_t));
-	pcq_create(queue, QUEUE_LENGTH);
+	pcq_create(queue, DEFAULT_QUEUE_LENGTH);
+	printf("Passei do pcq_create\n");
 
-	for(i = 0; i < argv[2]; i++) {
+	/* for(i = 0; i < argv[2]; i++) {
 		pthread_create(&worker_threads[i], NULL, &process_sessions, NULL);
-	} 
+	}  */
 
 	listen_for_requests(argv[1]);
 	return 0;
-	*/
+
 } 
 
 int handle_register_publisher(session_t *current) {
 	box_t *box;
 	int cp_fd;
-	int tfs_fd;
+	int tfs_fd; 
+	printf("HEYYY\n");
 	if ((cp_fd = open(current->pipe_name, O_RDONLY)) == -1) {
 		return -1;
 	}
@@ -98,6 +98,7 @@ int handle_register_publisher(session_t *current) {
 		close(cp_fd);
 		return -1;
 	}
+
 	if ((tfs_fd = tfs_open(current->box_name, TFS_O_APPEND)) == -1) {
 		close(cp_fd);
 		return -1;
@@ -117,7 +118,7 @@ int handle_register_publisher(session_t *current) {
 	}
 
 	box->n_publishers++;
-	box->pub_pipe_name = current->pipe_name;
+	memcpy(box->pub_pipe_name,current->pipe_name,CLIENT_PIPE_LENGTH); //Tive que mudar porque tu não no data.h tinhas char pub, assumo que n ias alocar memória 
 	mutex_unlock(&box->content_mutex);
 
 	while (true) {
@@ -146,22 +147,25 @@ int handle_register_publisher(session_t *current) {
 		if (ret == 0) {
 			break;
 		}
-
+		printf("MESSAGE_RECEIVED[%s]\n",message);
 		ret = tfs_write(tfs_fd, message, MAX_MSG_LENGTH);
 		ALWAYS_ASSERT(ret != -1, "tfs_write failed");
 		if (ret < MAX_MSG_LENGTH) {
 			// TEMP se tiver a dar erro aqui e so por tudo na mesma linha para dar fix
-			INFO("Box has ran out of
-					space, no further messages will be sent!");
+			INFO("Box has ran out of space, no further messages will be sent!");
 		}
 		// Signal subs
 		cond_signal(&box->condvar);
 	}
 	close(cp_fd);
-	tfs_close(tfs_fd);
-	decrease_box_pubs(box);
+	/* tfs_close(tfs_fd); */
+	/* decrease_box_pubs(box); */
 	return 0;
 }
+
+
+
+
 
 void process_sessions() {
 	while (true) {

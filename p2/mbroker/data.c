@@ -1,6 +1,7 @@
 #include "data.h"
 #include "producer-consumer.h"
 #include "locks.h"
+#include "operations.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,9 +36,25 @@ int find_box(char *name) {
 	return -1;
 }
 
-/* box_t* create_box(char *name) {
-	int i = 0;
-} */
+box_t* box_alloc(char *box_name,char* pipe_name) {
+	box_t* box = (box_t*)myalloc(sizeof(box_t*));
+	memcpy(box->name,box_name,sizeof(box->name));
+	memcpy(box->pub_pipe_name,pipe_name,sizeof(box->pub_pipe_name));
+	mutex_init(&box->content_mutex);
+	box->n_publishers = 0;
+	box->n_subscribers=0;
+	mutex_init(&box->condvar_mutex);
+	cond_init(&box->condvar);
+	box->status = OPEN ;
+	server_boxes[]
+}
+
+void erase_box(box_t* box) {
+	mutex_kill(&box->content_mutex);
+	mutex_kill(&box->condvar_mutex);
+	cond_kill(&box->condvar);
+	free(box);
+}
 
 void decrease_box_subs(box_t* box) {
 	mutex_lock(&box->content_mutex);
