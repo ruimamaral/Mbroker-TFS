@@ -19,7 +19,7 @@
 #define BOX_NAME_LENGTH 32
 #define CLIENT_PIPE_LENGTH 256
 
-#define REQUEST_PUBLISH_LEN (PUB_CREATION_CODE*sizeof(uint8_t) + CLIENT_PIPE_LENGTH*sizeof(char) + BOX_NAME_LENGTH*sizeof(char))
+#define REQUEST_PUBLISH_LEN (PUB_CREATION_CODE * sizeof(uint8_t) + CLIENT_PIPE_LENGTH * sizeof(char) + BOX_NAME_LENGTH * sizeof(char))
 #define REQUEST_SUB_LEN REQUEST_PUBLISH_LEN
 
 

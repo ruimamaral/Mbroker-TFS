@@ -32,7 +32,6 @@ void listen_for_requests(char* pipe_name) {
 		PANIC("Cannot open dummy pipe - aborting.")
 	}
 
-
 	while(true) {
 		ses = (session_t*) myalloc(sizeof(session_t));
 		read_pipe(server_pipe, &ses->code, sizeof(uint8_t));
@@ -48,7 +47,6 @@ void listen_for_requests(char* pipe_name) {
 			case 5:
 				read_pipe(server_pipe, ses->box_name,
 						sizeof(char) * MAX_BOX_NAME);
-				handle_register_publisher(ses);
 				break;
 
 			default:
@@ -72,7 +70,9 @@ int main(int argc, char **argv) {
 
 	ALWAYS_ASSERT(!tfs_init(NULL), "Cannot initialize tfs.");
 
-	server_boxes = (box_t**) myalloc(sizeof(box_t**) * 200 );
+	data_init();
+
+	server_boxes = (box_t**) myalloc(sizeof(box_t**) * DEFAULT_BOX_LIMIT);
 	queue = (pc_queue_t*) myalloc(sizeof(pc_queue_t));
 	pcq_create(queue, DEFAULT_QUEUE_LENGTH);
 	printf("Passei do pcq_create\n");
@@ -99,26 +99,26 @@ int handle_register_publisher(session_t *current) {
 		return -1;
 	}
 
-	if ((tfs_fd = tfs_open(current->box_name, TFS_O_APPEND)) == -1) {
+	if ((tfs_fd = tfs_open(box->path, TFS_O_APPEND)) == -1) {
 		close(cp_fd);
 		return -1;
 	}
 	mutex_lock(&box->content_mutex);
-	if (box->n_publishers > 0) {
+	if (!box || box->n_publishers > 0) {
 		close(cp_fd);
 		tfs_close(tfs_fd);
 		mutex_unlock(&box->content_mutex);
 		return -1;
-	}
+	}/*
 	if (box->status == CLOSED) {
 		close(cp_fd);
 		tfs_close(tfs_fd);
 		mutex_unlock(&box->content_mutex);
 		return -1;
 	}
-
+	box->pub_pipe_name = current->pipe_name;
+	*/
 	box->n_publishers++;
-	memcpy(box->pub_pipe_name,current->pipe_name,CLIENT_PIPE_LENGTH); //Tive que mudar porque tu não no data.h tinhas char pub, assumo que n ias alocar memória 
 	mutex_unlock(&box->content_mutex);
 
 	while (true) {
@@ -127,45 +127,42 @@ int handle_register_publisher(session_t *current) {
 		char message[MAX_MSG_LENGTH];
 		ret = read_pipe(cp_fd, &code, sizeof(u_int8_t));
 		mutex_lock(&box->content_mutex);
-		if (box->status == CLOSED) {
+		/*if (box->status == CLOSED) {
 			// Signals manager worker thread that is waiting for
 			// publishers and subscribers to terminate their sessions.
 			cond_signal(&box->condvar);
 			mutex_unlock(&box->content_mutex);
 			break;
-		}
+		}*/
 
-		// Pipe closed
 		if (ret == 0) {
+			// Pipe closed
 			break;
 		}
-		ALWAYS_ASSERT(code == PUBLISH_CODE,
-				"Invalid code received by worker thread.");
+		if (code != PUBLISH_CODE) {
+			// Client did not respect wire protocol
+			break;
+		}
 
 		ret = read_pipe(cp_fd, message, sizeof(char) * MAX_MSG_LENGTH);
-		// Pipe closed
 		if (ret == 0) {
+			// Pipe closed
 			break;
 		}
 		printf("MESSAGE_RECEIVED[%s]\n",message);
 		ret = tfs_write(tfs_fd, message, MAX_MSG_LENGTH);
 		ALWAYS_ASSERT(ret != -1, "tfs_write failed");
 		if (ret < MAX_MSG_LENGTH) {
-			// TEMP se tiver a dar erro aqui e so por tudo na mesma linha para dar fix
 			INFO("Box has ran out of space, no further messages will be sent!");
 		}
 		// Signal subs
-		cond_signal(&box->condvar);
+		cond_broadcast(&box->condvar);
 	}
 	close(cp_fd);
 	/* tfs_close(tfs_fd); */
 	/* decrease_box_pubs(box); */
 	return 0;
 }
-
-
-
-
 
 void process_sessions() {
 	while (true) {
