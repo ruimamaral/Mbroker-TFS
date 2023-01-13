@@ -24,6 +24,17 @@
 #define REQUEST_PUBLISH_LEN (sizeof(uint8_t) + CLIENT_PIPE_LENGTH * sizeof(char) + BOX_NAME_LENGTH * sizeof(char))
 #define REQUEST_SUB_LEN REQUEST_PUBLISH_LEN
 
+#define ERROR_MSG_LEN 1024
+
+#define ERR_BOX_EXISTS "Box already exists!"
+
+#define SET_ERROR(buf, msg, code) { \
+	buf = (char*) myalloc(ERROR_MSG_LEN * sizeof(char)); \
+	memcpy(buf, msg, ERROR_MSG_LEN * sizeof(char)); \
+	code = -1; \
+}
+
+
 
 void requestcpy(void *request,
 		size_t *request_offset, void *data, size_t size);

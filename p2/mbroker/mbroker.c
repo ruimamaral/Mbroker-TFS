@@ -203,6 +203,33 @@ int handle_register_publisher(session_t *current) {
 	return 0;
 }
 
+int handle_create_box(session_t *current) {
+	int ret;
+	int32_t ret_code = 0;
+	int cp_fd;
+	char *error_msg = NULL;
+	memset(error_msg, 0, ERROR_MSG_LEN * sizeof(char));
+	if ((cp_fd = open(current->pipe_name, O_WRONLY)) == -1) {
+		return -1;
+	}
+
+	ret = create_box(current->box_name);
+
+	switch (ret) {
+		case 0:
+			break;
+		case -1:
+			SET_ERROR(error_msg, "Box already exists!", ret_code);
+			break;
+		case -2:
+			SET_ERROR(error_msg, "Max amount of boxes reached!", ret_code);
+			break;
+	}
+	send_request(cp_fd, build_create_box_response(
+			ret_code, error_msg), SUBSCRIBER_RESPONSE_SIZE);
+	return ret;
+}
+
 void process_sessions() {
 	while (true) {
 		// If queue is empty, waits for a producer signal.
@@ -211,10 +238,13 @@ void process_sessions() {
 		// Pick handler function for each type of session
 		switch (current->code) {
 			case 1:
-				 handle_register_publisher(current);
+				handle_register_publisher(current);
 				break;
 			case 2:
 				handle_register_subscriber(current);
+				break;
+			case 3:
+				handle_create_box(current);
 				break;
 			default:
 				PANIC("Invalid code reached worker thread.");
