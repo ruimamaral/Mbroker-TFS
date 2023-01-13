@@ -72,9 +72,6 @@ int main(int argc, char **argv) {
 
 	data_init();
 
-	server_boxes = (box_t**) myalloc(sizeof(box_t**) * DEFAULT_BOX_LIMIT);
-	queue = (pc_queue_t*) myalloc(sizeof(pc_queue_t));
-	pcq_create(queue, DEFAULT_QUEUE_LENGTH);
 	printf("Passei do pcq_create\n");
 
 	/* for(i = 0; i < argv[2]; i++) {
@@ -83,8 +80,64 @@ int main(int argc, char **argv) {
 
 	listen_for_requests(argv[1]);
 	return 0;
-
 } 
+
+int handle_register_subscriber(session_t *current) {
+	box_t *box;
+	int cp_fd;
+	int tfs_fd; 
+	if ((cp_fd = open(current->pipe_name, O_WRONLY)) == -1) {
+		return -1;
+	}
+	if ((tfs_fd = tfs_open(box->path, NULL)) == -1) {
+		close(cp_fd);
+		return -1;
+	}
+	if ((box = add_sub_to_box(current->box_name)) == 0) {
+		close(cp_fd);
+		tfs_close(tfs_fd);
+		return -1;
+	}
+
+	while (true) {
+		ssize_t ret;
+		char message[MAX_MSG_LENGTH];
+		mutex_lock(&box->condvar_mutex);
+		while ((ret = tfs_read(tfs_fd, message, MAX_MSG_LENGTH)) == 0) {
+			cond_wait(&box->condvar, &box->condvar_mutex);
+		}
+		mutex_unlock(&box->condvar_mutex);
+
+		if (ret < 0) {
+			// tfs_read failed
+			break;
+		}
+		send_request(cp_fd,
+				build_subscriber_response(message), SUBSCRIBER_RESPONSE_SIZE);
+
+	}
+	close(cp_fd);
+	tfs_close(tfs_fd);
+
+	mutex_lock(&box->content_mutex);
+	box->n_subscribers--;
+	mutex_unlock(&box->content_mutex);
+
+	return 0;
+}
+
+uint8_t *build_subscriber_response(char *message) {
+	uint8_t code = SUBSCRIBER_RESPONSE_CODE;
+	size_t size = SUBSCRIBER_RESPONSE_SIZE;
+	uint8_t response = (uint8_t*) myalloc(size);
+	memset(response, 0, size);
+	size_t offset = 0;
+
+    requestcpy(response, &offset, &code, sizeof(uint8_t));
+    requestcpy(response, &offset,
+		message, MAX_MSG_LENGTH * sizeof(char));
+	return response;
+}
 
 int handle_register_publisher(session_t *current) {
 	box_t *box;
@@ -94,39 +147,22 @@ int handle_register_publisher(session_t *current) {
 	if ((cp_fd = open(current->pipe_name, O_RDONLY)) == -1) {
 		return -1;
 	}
-	if ((box = fetch_box(current->box_name)) == 0) {
-		close(cp_fd);
-		return -1;
-	}
-
 	if ((tfs_fd = tfs_open(box->path, TFS_O_APPEND)) == -1) {
 		close(cp_fd);
 		return -1;
 	}
-	mutex_lock(&box->content_mutex);
-	if (!box || box->n_publishers > 0) {
+	if ((box = add_pub_to_box(current->box_name)) == 0) {
 		close(cp_fd);
 		tfs_close(tfs_fd);
-		mutex_unlock(&box->content_mutex);
-		return -1;
-	}/*
-	if (box->status == CLOSED) {
-		close(cp_fd);
-		tfs_close(tfs_fd);
-		mutex_unlock(&box->content_mutex);
 		return -1;
 	}
-	box->pub_pipe_name = current->pipe_name;
-	*/
-	box->n_publishers++;
-	mutex_unlock(&box->content_mutex);
 
 	while (true) {
 		uint8_t code;
 		ssize_t ret;
 		char message[MAX_MSG_LENGTH];
 		ret = read_pipe(cp_fd, &code, sizeof(u_int8_t));
-		mutex_lock(&box->content_mutex);
+		//mutex_lock(&box->content_mutex);
 		/*if (box->status == CLOSED) {
 			// Signals manager worker thread that is waiting for
 			// publishers and subscribers to terminate their sessions.
@@ -151,16 +187,19 @@ int handle_register_publisher(session_t *current) {
 		}
 		printf("MESSAGE_RECEIVED[%s]\n",message);
 		ret = tfs_write(tfs_fd, message, MAX_MSG_LENGTH);
-		ALWAYS_ASSERT(ret != -1, "tfs_write failed");
 		if (ret < MAX_MSG_LENGTH) {
-			INFO("Box has ran out of space, no further messages will be sent!");
+			break; // Box ran out of space or write failed
 		}
 		// Signal subs
 		cond_broadcast(&box->condvar);
 	}
 	close(cp_fd);
-	/* tfs_close(tfs_fd); */
-	/* decrease_box_pubs(box); */
+	tfs_close(tfs_fd);
+
+	mutex_lock(&box->content_mutex);
+	box->n_publishers--;
+	mutex_unlock(&box->content_mutex);
+
 	return 0;
 }
 
@@ -172,7 +211,10 @@ void process_sessions() {
 		// Pick handler function for each type of session
 		switch (current->code) {
 			case 1:
-				/* handle_register_publisher(current); */
+				 handle_register_publisher(current);
+				break;
+			case 2:
+				handle_register_subscriber(current);
 				break;
 			default:
 				PANIC("Invalid code reached worker thread.");

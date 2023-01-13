@@ -38,7 +38,7 @@ box_t *fetch_box(char *name);
 int find_box(char *name);
 int create_box(char *name);
 int box_alloc(box_t *box, char *box_name);
-void decrease_box_subs(box_t* box);
-void decrease_box_pubs(box_t* box);
+box_t *add_sub_to_box(char *box_name);
+box_t *add_pub_to_box(char *box_name);
 
 #endif
