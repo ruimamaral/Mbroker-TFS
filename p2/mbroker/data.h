@@ -38,6 +38,7 @@ typedef struct {
 extern pc_queue_t *queue;
 
 int data_init();
+int box_init(box_t *box);
 box_t *fetch_box(char *name);
 int box_remove(char* box_name);
 void box_kill(box_t* box);

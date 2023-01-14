@@ -121,7 +121,6 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-	unlink(pipe_name);
 
 	if (mkfifo(pipe_name, 0777) == -1) {
         printf("Unable to create client pipe\n");
