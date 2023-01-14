@@ -58,13 +58,15 @@ int create_box(char *box_name) {
 			slot = i;
 		}
 	}
+	printf("EW\n");
 	if (slot < 0) {
 		// No space
 		printf("NO->3\n");
 		return -2;
 	}
+	printf("EW2\n");
 	box = (box_t*) myalloc(sizeof(box_t));
-	if (!box_alloc(box, box_name)) {
+	if (box_alloc(box, box_name)) {
 		// Could not allocate box
 		printf("NO->4\n");
 		free(box);
@@ -96,21 +98,27 @@ int box_remove(char* box_name) {
 }
 
 int box_alloc(box_t *box, char *box_name) {
-	int ret;
-	if ((ret = tfs_open(box_name, TFS_O_CREAT & TFS_O_TRUNC)) == -1) {
+	printf("AYO\n");
+	char dest_path[TFS_BOX_PATH_LEN];
+	memcpy(dest_path,"/",sizeof(char));
+	memcpy(dest_path+1,box_name,MAX_BOX_NAME-1);
+	printf("dest->%s\n",dest_path);
+	int ret; 
+	if ((ret = tfs_open(dest_path, TFS_O_CREAT & TFS_O_TRUNC)) == -1) {
 		return -1;
-	}
+	} 
 	tfs_close(ret); // close the file we just opened
 	mutex_init(&box->content_mutex);
 	mutex_init(&box->condvar_mutex);
 	cond_init(&box->condvar);
 
 	mutex_lock(&box->content_mutex);
+
 	box->path = (char*) myalloc(sizeof(char) * TFS_BOX_PATH_LEN);
 	memset(box->path, 0, TFS_BOX_PATH_LEN * sizeof(char));
-	box->path[0] = '/';
-	box->name = box->path[1];
-	memcpy(box->path, box_name, MAX_BOX_NAME - 1);
+	memcpy(box->path, dest_path, MAX_BOX_NAME); 
+	box->name = box->path + 1;
+
 	box->n_publishers = 0;
 	box->n_subscribers = 0;
 	//box->status = OPEN;
