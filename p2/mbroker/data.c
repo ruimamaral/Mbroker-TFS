@@ -66,6 +66,7 @@ int create_box(char *box_name) {
 			// Box already exists
 			printf("NO->1\n");
 			mutex_unlock(&box->content_mutex);
+			mutex_unlock(&box_table_lock);
 			return -1;
 		}
 		mutex_unlock(&box->content_mutex);
@@ -79,6 +80,7 @@ int create_box(char *box_name) {
 	if (slot < 0) {
 		// No space
 		printf("NO->3\n");
+		mutex_unlock(&box_table_lock);
 		return -2;
 	}
 	printf("EW2\n");
@@ -90,6 +92,8 @@ int create_box(char *box_name) {
 	memcpy(box->name, box_name, MAX_BOX_NAME * sizeof(char)); 
 	// Create file in tfs (or open and truncate contents)
 	if ((ret = tfs_open(box->path, TFS_O_CREAT | TFS_O_TRUNC)) == -1) {
+		mutex_unlock(&box->content_mutex);
+		mutex_unlock(&box_table_lock);
 		return -3;
 	} 
 	tfs_close(ret); // close the file we just opened
@@ -112,12 +116,17 @@ int box_remove(char* box_name) {
 
 	i = find_box(box_name);
 	if (i < 0) {
+		mutex_unlock(&box_table_lock);
 		return -1;
 	}
 	box = server_boxes[i];
 
 	// Lock to prevent signal leakage and/or data races from accessing box.
 	mutex_lock(&box->content_mutex);
+
+	// Should never happen during regular execution
+	ALWAYS_ASSERT(box->status == NORMAL,
+			"Illegal access to box has occurred.");
 
 	// Changes flag to closed to notify any subscribers/publishers
 	box->status = CLOSED;
@@ -215,11 +224,13 @@ box_t *add_pub_to_box(char *box_name) {
 	box_t *box;
 	mutex_lock(&box_table_lock);
 	if ((box = fetch_box(box_name)) == 0) {
+		mutex_unlock(&box_table_lock);
 		return 0;
 	}
 	mutex_lock(&box->content_mutex);
 	if (box->n_publishers > 0) {
 		mutex_unlock(&box->content_mutex);
+		mutex_unlock(&box_table_lock);
 		return 0;
 	}
 	box->n_publishers++;
@@ -232,6 +243,7 @@ box_t *add_sub_to_box(char *box_name) {
 	box_t *box;
 	mutex_lock(&box_table_lock);
 	if ((box = fetch_box(box_name)) == 0) {
+		mutex_unlock(&box_table_lock);
 		return 0;
 	}
 	mutex_lock(&box->content_mutex);

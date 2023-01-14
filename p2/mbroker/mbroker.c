@@ -37,6 +37,8 @@ void listen_for_requests(char* pipe_name) {
 		ses = (session_t*) myalloc(sizeof(session_t));
 		read_pipe(server_pipe, &ses->code, sizeof(uint8_t));
 		read_pipe(server_pipe, ses->pipe_name,sizeof(char) * CLIENT_PIPE_LENGTH);
+		// Makes sure that the \0 character is always present
+		ses->pipe_name[CLIENT_PIPE_LENGTH - 1] = '\0';
 		switch(ses->code) {
 			case 7:
 				// List boxes request (doesn't have box_name parameter)
@@ -48,6 +50,8 @@ void listen_for_requests(char* pipe_name) {
 			case 5:
 				read_pipe(server_pipe, ses->box_name,
 						sizeof(char) * MAX_BOX_NAME);
+				// Makes sure that the \0 character is always present
+				ses->box_name[MAX_BOX_NAME - 1] = '\0';
 				printf("Recebi\n");
 				break;
 
@@ -77,7 +81,6 @@ int main(int argc, char **argv) {
 	ALWAYS_ASSERT(!tfs_init(&params), "Cannot initialize tfs.");
 
 	data_init();
-	printf("Passei do pcq_create\n");
 
 	for(int i = 0; i < max_sessions; i++) {
 		pthread_create(&worker_threads[i], NULL, &process_sessions, NULL);
@@ -188,7 +191,7 @@ int handle_register_publisher(session_t *current) {
 		ret = read_pipe(cp_fd, &code, sizeof(u_int8_t));
 		// Lock to prevent signal leakage and/or data races from accessing box.
 		mutex_lock(&box->content_mutex);
-		// Checks if the box is under the process of removal.
+		// Checks if the box is undergoing the process of removal.
 		if (box->status == CLOSED) {
 			close(cp_fd);
 			tfs_close(tfs_fd);
@@ -251,7 +254,7 @@ uint8_t *build_create_box_response(int32_t ret_code, char *error_msg) {
 
 int handle_create_box(session_t *current) {
 	int ret;
-	/* int32_t ret_code = 0;  */
+	int32_t ret_code = 0;
 	int cp_fd;
 	void *error_msg = (void*) myalloc(ERROR_MSG_LEN * sizeof(char));
 	memset(error_msg, 0, ERROR_MSG_LEN * sizeof(char));
@@ -262,7 +265,7 @@ int handle_create_box(session_t *current) {
 
 	ret = create_box(current->box_name);
 
-	/* switch (ret) {
+	switch (ret) {
 		case 0:
 			break;
 		case -1:
@@ -278,8 +281,10 @@ int handle_create_box(session_t *current) {
 			return -1;
 	}
 	send_request(cp_fd, build_create_box_response(
-			ret_code, error_msg), MANAGER_RESPONSE_SIZE); */
-	//close(cp_fd);
+			ret_code, error_msg), MANAGER_RESPONSE_SIZE);
+
+	sleep(1); // Gives client process time to read the server response
+	close(cp_fd);
 	return ret;
 } 
 

@@ -18,11 +18,13 @@ typedef enum { FREE = 0, TAKEN = 1 } allocation_state_t;
 typedef struct {
 	char *path;
 	char *name;
-	pthread_mutex_t content_mutex;
 	int n_subscribers;
 	int n_publishers;
-	pthread_mutex_t condvar_mutex;
 	pthread_cond_t condvar;
+	// We only needed one mutex due to the fact that most conditions
+	// depended on the content of the box, therefore, one mutex does
+	// both jobs easily.
+	pthread_mutex_t content_mutex;
 	char *pub_pipe_name;
 	box_status_t status;
 } box_t;
