@@ -18,8 +18,9 @@ typedef enum { FREE = 0, TAKEN = 1 } allocation_state_t;
 typedef struct {
 	char *path;
 	char *name;
-	int n_subscribers;
-	int n_publishers;
+	uint64_t n_subscribers;
+	uint64_t n_publishers;
+	uint64_t box_size;
 	pthread_cond_t condvar;
 	// We only needed one mutex due to the fact that most conditions
 	// depended on the content of the box, therefore, one mutex does
@@ -43,9 +44,10 @@ box_t *fetch_box(char *name);
 int box_remove(char* box_name);
 void box_kill(box_t* box);
 int find_box(char *name);
-int create_box(char *name);
+int box_create(char *name);
 int box_alloc(box_t *box);
-box_t *add_sub_to_box(char *box_name);
-box_t *add_pub_to_box(char *box_name);
+box_t **box_get_all(size_t *amount);
+box_t *box_add_sub(char *box_name);
+box_t *box_add_pub(char *box_name);
 
 #endif

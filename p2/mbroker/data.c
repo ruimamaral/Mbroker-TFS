@@ -15,6 +15,7 @@ box_t **server_boxes;
 pc_queue_t *queue;
 pthread_mutex_t box_table_lock;
 allocation_state_t *free_box_table;
+size_t box_amount;
 
 int data_init() {
 	server_boxes = (box_t**) myalloc(sizeof(box_t*) * DEFAULT_BOX_LIMIT);
@@ -30,6 +31,7 @@ int data_init() {
 		box_alloc(server_boxes[i]);
 		free_box_table[i] = FREE;
 	}
+	box_amount = 0;
 	mutex_unlock(&box_table_lock);
 	return 0;
 }
@@ -55,7 +57,7 @@ int find_box(char *name) {
 	return -1;
 }
 
-int create_box(char *box_name) {
+int box_create(char *box_name) {
 	int i;
 	int slot = -1;
 	int ret;
@@ -100,6 +102,7 @@ int create_box(char *box_name) {
 	} 
 	tfs_close(ret); // close the file we just opened
 	free_box_table[slot] = TAKEN;
+	box_amount++;
 
 	printf("CREATE |||| box_path->%s||box_name->%s\n",server_boxes[slot]->path,server_boxes[slot]->name);
 
@@ -178,6 +181,7 @@ int box_remove(char* box_name) {
 	// formally remove the box from the server.
 	tfs_unlink(box->path);
 	free_box_table[i] = FREE;
+	box_amount--;
 
 	mutex_unlock(&box->content_mutex);
 	mutex_unlock(&box_table_lock);
@@ -189,6 +193,7 @@ int box_init(box_t *box) {
 
 	box->n_publishers = 0;
 	box->n_subscribers = 0;
+	box->box_size = 0;
 	box->status = NORMAL;
 	box->pub_pipe_name = NULL;
 
@@ -220,7 +225,31 @@ void box_kill(box_t* box) {
 	mutex_kill(&box->content_mutex);
 }
 
-box_t *add_pub_to_box(char *box_name) {
+box_t **box_get_all(size_t *amount) {
+	mutex_lock(&box_table_lock);
+	(*amount) = box_amount;
+	size_t count = 0;
+	if ((*amount) == 0) {
+		mutex_unlock(&box_table_lock);
+		return 0;
+	}
+
+	box_t **boxes = (box_t**) myalloc(sizeof(box_t*) * box_amount);
+
+	for (int i = 0; i < DEFAULT_BOX_LIMIT; i++) {
+		if (free_box_table[i] == TAKEN) {
+			boxes[count] = (box_t*) myalloc(sizeof(box_t));
+			// Copy box contents to array
+			(*boxes[count++]) = (*server_boxes[i]);
+		}
+	}
+	mutex_unlock(&box_table_lock);
+	// Should never happen during regular execution.
+	ALWAYS_ASSERT(count == (*amount), "Sanity check failed!");
+	return boxes;
+}
+
+box_t *box_add_pub(char *box_name) {
 	box_t *box;
 	mutex_lock(&box_table_lock);
 	if ((box = fetch_box(box_name)) == 0) {
@@ -239,7 +268,7 @@ box_t *add_pub_to_box(char *box_name) {
 	return box;
 }
 
-box_t *add_sub_to_box(char *box_name) {
+box_t *box_add_sub(char *box_name) {
 	box_t *box;
 	mutex_lock(&box_table_lock);
 	if ((box = fetch_box(box_name)) == 0) {
