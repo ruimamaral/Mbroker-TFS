@@ -72,8 +72,9 @@ int main(int argc, char **argv) {
 	unlink(argv[1]);
 	
 	ALWAYS_ASSERT(mkfifo(argv[1], 0777) != -1, "Cannot create register pipe");
+	tfs_params params = tfs_our_params();
 
-	ALWAYS_ASSERT(!tfs_init(NULL), "Cannot initialize tfs.");
+	ALWAYS_ASSERT(!tfs_init(&params), "Cannot initialize tfs.");
 
 	data_init();
 	printf("Passei do pcq_create\n");
@@ -146,19 +147,16 @@ uint8_t *build_subscriber_response(char *message) {
 }
 
 int handle_register_publisher(session_t *current) {
-	/* box_t *box; */
+	box_t *box;
 	int cp_fd;
-	/* int tfs_fd;  */
-	printf("HEYYY\n");
+	int tfs_fd; 
 	if ((cp_fd = open(current->pipe_name, O_RDONLY)) == -1) {
 		return -1;
 	}
 
 	create_box(current->box_name);
-	box_t* box = fetch_box(current->box_name);
-	printf("box_path->%s||box_name->%s\n",box->path,box->name);
 	
-	/* if ((box = add_pub_to_box(current->box_name)) == 0) {
+	 if ((box = add_pub_to_box(current->box_name)) == 0) {
 		close(cp_fd);
 		return -1;
 	}
@@ -166,7 +164,7 @@ int handle_register_publisher(session_t *current) {
 	if ((tfs_fd = tfs_open(box->path, TFS_O_APPEND)) == -1) {
 		close(cp_fd);
 		return -1;
-	} */
+	}
 
 	while (true) {
 		uint8_t code;
@@ -197,19 +195,19 @@ int handle_register_publisher(session_t *current) {
 			break;
 		}
 		printf("MESSAGE_RECEIVED[%s]\n",message);
-		/* ret = tfs_write(tfs_fd, message, MAX_MSG_LENGTH);
+		ret = tfs_write(tfs_fd, message, MAX_MSG_LENGTH);
 		if (ret < MAX_MSG_LENGTH) {
 			break; // Box ran out of space or write failed
 		}
 		// Signal subs
-		cond_broadcast(&box->condvar); */
+		cond_broadcast(&box->condvar);
 	}
 	close(cp_fd);
-	/* tfs_close(tfs_fd); */
+	tfs_close(tfs_fd);
 
-	/* mutex_lock(&box->content_mutex);
+	mutex_lock(&box->content_mutex);
 	box->n_publishers--;
-	mutex_unlock(&box->content_mutex); */
+	mutex_unlock(&box->content_mutex);
 
 	return 0;
 }

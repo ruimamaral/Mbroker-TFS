@@ -98,13 +98,12 @@ int box_remove(char* box_name) {
 }
 
 int box_alloc(box_t *box, char *box_name) {
-	printf("AYO\n");
+
 	char dest_path[TFS_BOX_PATH_LEN];
 	memcpy(dest_path,"/",sizeof(char));
 	memcpy(dest_path+1,box_name,MAX_BOX_NAME-1);
-	printf("dest->%s\n",dest_path);
 	int ret; 
-	if ((ret = tfs_open(dest_path, TFS_O_CREAT & TFS_O_TRUNC)) == -1) {
+	if ((ret = tfs_open(dest_path, TFS_O_CREAT | TFS_O_TRUNC)) == -1) {
 		return -1;
 	} 
 	tfs_close(ret); // close the file we just opened
@@ -117,7 +116,7 @@ int box_alloc(box_t *box, char *box_name) {
 	box->path = (char*) myalloc(sizeof(char) * TFS_BOX_PATH_LEN);
 	memset(box->path, 0, TFS_BOX_PATH_LEN * sizeof(char));
 	memcpy(box->path, dest_path, MAX_BOX_NAME); 
-	box->name = box->path + 1;
+	box->name = box->path + sizeof(char); 		//path without the '/'
 
 	box->n_publishers = 0;
 	box->n_subscribers = 0;

@@ -2,9 +2,21 @@
 #define MBROKER_H
 
 #include "data.h"
+#include "operations.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+
+
+tfs_params tfs_our_params () {
+    tfs_params params = {
+        .max_inode_count = 64,
+        .max_block_count = 1024,
+        .max_open_files_count = 16,
+        .block_size = 20000,
+    };
+    return params;
+}
 
 void listen_for_requests(char* pipe_name);
 void* process_sessions();

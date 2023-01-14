@@ -19,6 +19,7 @@ ssize_t write_pipe(int fd, void const *buffer, size_t buffer_size) {
 	// Keeps trying to write if the pipe is full
 	while (written < buffer_size) {
     	ssize_t ret = write(fd, buffer, buffer_size);
+		printf("ret->%zu\n",ret);
 		ALWAYS_ASSERT(ret > 0, "write to pipe failed");
 		written += ret;
 	}

@@ -11,6 +11,7 @@
 #define DEFAULT_BOX_LIMIT 32
 #define TFS_BOX_PATH_LEN (BOX_NAME_LENGTH + 1)
 
+
 typedef enum { OPEN = 0, CLOSED = 1 } box_status_t;
 
 typedef struct {
