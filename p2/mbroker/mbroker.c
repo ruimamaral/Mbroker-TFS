@@ -98,16 +98,17 @@ int handle_register_subscriber(session_t *current) {
 		return -1;
 	}
 
-	if ((box = add_sub_to_box(current->box_name)) == 0) {
-		close(cp_fd);
-		return -1;
-	}
-	
-	if ((tfs_fd = tfs_open(box->path, TFS_O_CREAT)) == -1) {
+	if ((tfs_fd = tfs_open(box->path, 0)) == -1) {
 		close(cp_fd);
 		return -1;
 	}
 
+	if ((box = box_add_sub(current->box_name)) == 0) {
+		close(cp_fd);
+		tfs_close(tfs_fd);
+		return -1;
+	}
+	
 	while (true) {
 		ssize_t ret;
 		char message[MAX_MSG_LENGTH];
@@ -177,13 +178,14 @@ int handle_register_publisher(session_t *current) {
 		return -1;
 	}
 
-	if ((box = add_pub_to_box(current->box_name)) == 0) {
+	if ((tfs_fd = tfs_open(box->path, TFS_O_APPEND)) == -1) {
 		close(cp_fd);
 		return -1;
 	}
 
-	if ((tfs_fd = tfs_open(box->path, TFS_O_APPEND)) == -1) {
+	if ((box = box_add_pub(current->box_name)) == 0) {
 		close(cp_fd);
+		tfs_close(tfs_fd);
 		return -1;
 	}
 
@@ -244,7 +246,7 @@ int handle_register_publisher(session_t *current) {
 	return 0;
 }
 
-uint8_t *build_create_box_response(int32_t ret_code, char *error_msg) {
+uint8_t *build_manager_response(int32_t ret_code, char *error_msg) {
 	uint8_t code = MANAGER_CREATE_RESPONSE_CODE;
 	size_t size = MANAGER_RESPONSE_SIZE;
 	uint8_t* response = (uint8_t*) myalloc(size);
@@ -269,7 +271,7 @@ int handle_create_box(session_t *current) {
 		return -1;
 	}
 
-	ret = create_box(current->box_name);
+	ret = box_create(current->box_name);
 
 	switch (ret) {
 		case 0:
@@ -286,13 +288,100 @@ int handle_create_box(session_t *current) {
 		default:
 			return -1;
 	}
-	send_request(cp_fd, build_create_box_response(
+	send_request(cp_fd, build_manager_response(
 			ret_code, error_msg), MANAGER_RESPONSE_SIZE);
 
 	sleep(1); // Gives client process time to read the server response
 	close(cp_fd);
 	return ret;
 } 
+
+int handle_remove_box(session_t* current) {
+	int ret;
+	int32_t ret_code = 0;
+	int cp_fd;
+	void *error_msg = (void*) myalloc(ERROR_MSG_LEN * sizeof(char));
+	memset(error_msg, 0, ERROR_MSG_LEN * sizeof(char));
+
+	if ((cp_fd = open(current->pipe_name, O_WRONLY)) == -1) {
+		return -1;
+	}
+
+	ret = box_remove(current->box_name);
+
+	switch (ret) {
+		case 0:
+			break;
+		case -1:
+			SET_ERROR(error_msg, ERR_BOX_DOESNT_EXIST, ret_code);
+			break;
+		default:
+			return -1;
+	}
+	send_request(cp_fd, build_manager_response(
+			ret_code, error_msg), MANAGER_RESPONSE_SIZE);
+
+	sleep(1); // Gives client process time to read the server response
+	close(cp_fd);
+	return ret;
+}
+uint8_t *build_list_boxes_response(uint8_t last, box_t* box) {
+	uint8_t code = LIST_BOXES_RESPONSE_CODE;
+	size_t size = LIST_BOXES_RESPONSE_SIZE;
+	uint8_t* response = (uint8_t*) myalloc(size);
+	memset(response, 0, size);
+	size_t offset = 0;
+
+    requestcpy(response, &offset, &code, sizeof(uint8_t));
+	requestcpy(response, &offset, &last, sizeof(int32_t));
+	requestcpy(response, &offset, box->name, MAX_BOX_NAME * sizeof(char));
+    requestcpy(response, &offset, box->box_size, sizeof(uint64_t));
+    requestcpy(response, &offset, box->n_publishers, sizeof(uint64_t));
+    requestcpy(response, &offset, box->n_subscribers, sizeof(uint64_t));
+	return response;
+}
+
+int handle_list_boxes(session_t* current) {
+	int ret;
+	uint8_t last = 0;
+	size_t box_amount;
+	box_t **boxes;
+	int cp_fd;
+
+	if ((cp_fd = open(current->pipe_name, O_WRONLY)) == -1) {
+		return -1;
+	}
+
+	boxes = box_get_all(&box_amount);
+
+	if (box_amount = 0) {
+		char *box_name = (char*) myalloc(sizeof(char) * MAX_BOX_NAME);
+		size_t response_size = 
+				2 * sizeof(uint8_t) + sizeof(char) * MAX_BOX_NAME;
+		uint8_t *response = (char*) myalloc(response_size);
+		uint8_t code = LIST_BOXES_RESPONSE_CODE;
+		size_t offset = 0;
+		memset(box_name, 0, MAX_BOX_NAME);
+		memset(response, 0, response_size);
+		requestcpy(response, &offset, &code, sizeof(uint8_t));
+		requestcpy(response, &offset, &last, sizeof(uint8_t));
+		requestcpy(response, &offset,
+				box_name, sizeof(MAX_BOX_NAME * sizeof(char)));
+		send_request(cp_fd, response, response_size);
+		free(box_name);
+		return 0;
+	}
+	for (int i = 0; i < box_amount; i++) {
+		if (i = box_amount - 1) {
+			last = 1;
+		}
+		send_request(cp_fd, build_list_boxes_response(
+				last, boxes[i]), LIST_BOXES_RESPONSE_SIZE);
+		free(boxes[i]);
+	}
+
+	free(boxes);
+}
 
 void* process_sessions() {
 	while (true) {
@@ -310,6 +399,12 @@ void* process_sessions() {
 				break;
 			case MANAGER_CREATE_CODE:
 				handle_create_box(current);
+				break;
+			case MANAGER_REMOVE_CODE:
+				handle_remove_box(current);
+				break;
+			case LIST_BOXES_CODE:
+				handle_list_boxes(current);
 				break;
 			default:
 				PANIC("Invalid code reached worker thread.");
