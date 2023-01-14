@@ -116,7 +116,7 @@ int handle_register_subscriber(session_t *current) {
 		mutex_lock(&box->content_mutex);
 
 		while ((ret = tfs_read(tfs_fd, message,
-				MAX_MSG_LENGTH)) == 0 && box->status != CLOSED) {
+				MAX_MSG_LENGTH)) == 0 && box->status == NORMAL) {
 
 			cond_wait(&box->condvar, &box->content_mutex);
 		}
@@ -148,6 +148,9 @@ int handle_register_subscriber(session_t *current) {
 
 	mutex_lock(&box->content_mutex);
 	box->n_subscribers--;
+	// Broadcast in order to prevent infinite waiting by a manager thread
+	// trying to remove the box.
+	cond_broadcast(&box->condvar);
 	mutex_unlock(&box->content_mutex);
 
 	return 0;
@@ -233,6 +236,9 @@ int handle_register_publisher(session_t *current) {
 
 	mutex_lock(&box->content_mutex);
 	box->n_publishers--;
+	// Broadcast in order to prevent infinite waiting by a manager thread
+	// trying to remove the box.
+	cond_broadcast(&box->condvar);
 	mutex_unlock(&box->content_mutex);
 
 	return 0;

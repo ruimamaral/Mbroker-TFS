@@ -174,7 +174,7 @@ int box_remove(char* box_name) {
 
 	// After all client sessions are terminated, we can safely
 	// formally remove the box from the server.
-	tfs_close(box->path);
+	tfs_unlink(box->path);
 	free_box_table[i] = FREE;
 
 	mutex_unlock(&box->content_mutex);
@@ -198,7 +198,6 @@ int box_init(box_t *box) {
 int box_alloc(box_t *box) {
 	mutex_init(&box->content_mutex);
 	mutex_lock(&box->content_mutex);
-	mutex_init(&box->condvar_mutex);
 	cond_init(&box->condvar);
 
 	box->path = (char*) myalloc(sizeof(char) * TFS_BOX_PATH_LEN);
@@ -214,7 +213,6 @@ int box_alloc(box_t *box) {
 void box_kill(box_t* box) {
 	mutex_lock(&box->content_mutex);
 	free(box->path);
-	mutex_kill(&box->condvar_mutex);
 	cond_kill(&box->condvar);
 	mutex_unlock(&box->content_mutex);
 	mutex_kill(&box->content_mutex);
