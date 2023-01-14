@@ -63,7 +63,7 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
 	mutex_unlock(&queue->pcq_pusher_condvar_lock);
 
 	mutex_lock(&queue->pcq_popper_condvar_lock);
-	cond_broadcast(&queue->pcq_popper_condvar);
+	cond_signal(&queue->pcq_popper_condvar);
 	mutex_unlock(&queue->pcq_popper_condvar_lock);
 
 	return 0;
@@ -92,7 +92,7 @@ void *pcq_dequeue(pc_queue_t *queue) {
 	mutex_unlock(&queue->pcq_popper_condvar_lock);
 
 	mutex_lock(&queue->pcq_pusher_condvar_lock);
-	cond_broadcast(&queue->pcq_pusher_condvar);
+	cond_signal(&queue->pcq_pusher_condvar);
 	mutex_unlock(&queue->pcq_pusher_condvar_lock);
 
 	return ret;

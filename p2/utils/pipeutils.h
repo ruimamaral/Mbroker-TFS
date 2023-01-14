@@ -38,7 +38,7 @@
 		+ sizeof(int32_t) + sizeof(uint8_t))
 
 #define SET_ERROR(buf, msg, code) { \
-	memcpy(buf, msg, ERROR_MSG_LEN * sizeof(char)); \
+	memcpy(buf, msg, strlen(msg) * sizeof(char)); \
 	code = -1; \
 }
 

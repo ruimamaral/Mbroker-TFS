@@ -83,13 +83,14 @@ int main(int argc, char **argv) {
     }
 
 	// Waits for pipe to be opened server-side
-	if ((fd = open(pipe_name, O_WRONLY)) == -1) {
+	if ((fd = open(pipe_name, O_RDONLY)) == -1) {
 		close(rp_fd);
 		unlink(pipe_name);
         printf("Cannot open client pipe\n");
 		return -1;
 	}
-	if(subscribe(fd) == -1) {
+	if (subscribe(fd) == -1) {
+		destroy(pipe_name, fd, rp_fd);
 		return -1;
 	}
 

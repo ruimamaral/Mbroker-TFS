@@ -95,8 +95,7 @@ int handle_register_subscriber(session_t *current) {
 		return -1;
 	}
 
-	
-	 if ((box = add_sub_to_box(current->box_name)) == 0) {
+	if ((box = add_sub_to_box(current->box_name)) == 0) {
 		close(cp_fd);
 		return -1;
 	}
@@ -109,11 +108,29 @@ int handle_register_subscriber(session_t *current) {
 	while (true) {
 		ssize_t ret;
 		char message[MAX_MSG_LENGTH];
-		mutex_lock(&box->condvar_mutex);
-		while ((ret = tfs_read(tfs_fd, message, MAX_MSG_LENGTH)) == 0) {
-			cond_wait(&box->condvar, &box->condvar_mutex);
+
+		// Lock to prevent signal leakage and/or data races from accessing box.
+		mutex_lock(&box->content_mutex);
+
+		while ((ret = tfs_read(tfs_fd, message,
+				MAX_MSG_LENGTH)) == 0 && box->status != CLOSED) {
+
+			cond_wait(&box->condvar, &box->content_mutex);
 		}
-		mutex_unlock(&box->condvar_mutex);
+		// If the box is under the process of removal by a manager thread,
+		// we end our session by decreasing subscriber amount and leaving.
+		if (box->status == CLOSED) {
+			close(cp_fd);
+			tfs_close(tfs_fd);
+			box->n_subscribers--;
+			// Last subscriber will signal the manager worker thread,
+			// which will see that no subscribers are left and it will
+			// then safely close the box.
+			cond_signal(&box->condvar);
+			mutex_unlock(&box->content_mutex);
+			return 0;
+		}
+		mutex_unlock(&box->content_mutex);
 
 		if (ret < 0) {
 			// tfs_read failed
@@ -154,9 +171,7 @@ int handle_register_publisher(session_t *current) {
 		return -1;
 	}
 
-	create_box(current->box_name);
-	
-	 if ((box = add_pub_to_box(current->box_name)) == 0) {
+	if ((box = add_pub_to_box(current->box_name)) == 0) {
 		close(cp_fd);
 		return -1;
 	}
@@ -171,14 +186,20 @@ int handle_register_publisher(session_t *current) {
 		ssize_t ret;
 		char message[MAX_MSG_LENGTH];
 		ret = read_pipe(cp_fd, &code, sizeof(u_int8_t));
-		//mutex_lock(&box->content_mutex);
-		/*if (box->status == CLOSED) {
+		// Lock to prevent signal leakage and/or data races from accessing box.
+		mutex_lock(&box->content_mutex);
+		// Checks if the box is under the process of removal.
+		if (box->status == CLOSED) {
+			close(cp_fd);
+			tfs_close(tfs_fd);
+			box->n_publishers--;
 			// Signals manager worker thread that is waiting for
 			// publishers and subscribers to terminate their sessions.
 			cond_signal(&box->condvar);
 			mutex_unlock(&box->content_mutex);
-			break;
-		}*/
+			return 0;
+		}
+		mutex_unlock(&box->content_mutex);
 
 		if (ret == 0) {
 			// Pipe closed
@@ -199,8 +220,10 @@ int handle_register_publisher(session_t *current) {
 		if (ret < MAX_MSG_LENGTH) {
 			break; // Box ran out of space or write failed
 		}
+		mutex_lock(&box->content_mutex);
 		// Signal subs
 		cond_broadcast(&box->condvar);
+		mutex_unlock(&box->content_mutex);
 	}
 	close(cp_fd);
 	tfs_close(tfs_fd);
@@ -256,6 +279,7 @@ int handle_create_box(session_t *current) {
 	}
 	send_request(cp_fd, build_create_box_response(
 			ret_code, error_msg), MANAGER_RESPONSE_SIZE); */
+	//close(cp_fd);
 	return ret;
 } 
 

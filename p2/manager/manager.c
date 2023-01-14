@@ -38,6 +38,9 @@ int main(int argc, char **argv) {
 	char *pipe_name = argv[2];
 	char *response = (char*) myalloc(MANAGER_RESPONSE_SIZE);
 	int rp_fd, cp_fd;
+
+	unlink(pipe_name);
+
 	ALWAYS_ASSERT(argc == 5, "Invalid arguments.");
 	ALWAYS_ASSERT(mkfifo(pipe_name, 0777) != -1, "Could not create pipe.");
 	ALWAYS_ASSERT((rp_fd = open(argv[1],

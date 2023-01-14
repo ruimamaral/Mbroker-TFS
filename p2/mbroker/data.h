@@ -12,7 +12,8 @@
 #define TFS_BOX_PATH_LEN (BOX_NAME_LENGTH + 1)
 
 
-typedef enum { OPEN = 0, CLOSED = 1 } box_status_t;
+typedef enum { NORMAL = 0, CLOSED = 1 } box_status_t;
+typedef enum { FREE = 0, TAKEN = 1 } allocation_state_t;
 
 typedef struct {
 	char *path;
@@ -22,8 +23,8 @@ typedef struct {
 	int n_publishers;
 	pthread_mutex_t condvar_mutex;
 	pthread_cond_t condvar;
-	// char *pub_pipe_name;
-	// box_status_t status;
+	char *pub_pipe_name;
+	box_status_t status;
 } box_t;
 
 typedef struct {
@@ -40,7 +41,7 @@ int box_remove(char* box_name);
 void box_kill(box_t* box);
 int find_box(char *name);
 int create_box(char *name);
-int box_alloc(box_t *box, char *box_name);
+int box_alloc(box_t *box);
 box_t *add_sub_to_box(char *box_name);
 box_t *add_pub_to_box(char *box_name);
 
