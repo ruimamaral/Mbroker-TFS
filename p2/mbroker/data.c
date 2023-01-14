@@ -46,7 +46,7 @@ int create_box(char *box_name) {
 	box_t* box;
 	mutex_lock(&box_table_lock);
 	for (i = 0; i < DEFAULT_BOX_LIMIT; i++) {
-		box_t *box = server_boxes[i];
+		box = server_boxes[i];
 		if (box && !strcmp(box->name, box_name)) {
 			// Box already exists
 			return -1;
@@ -81,8 +81,8 @@ int box_remove(char* box_name) {
 	}
 	box = server_boxes[i];
 	server_boxes[i] = NULL;
-	mutex_unlock(&box_table_lock);
 	box_kill(box);
+	mutex_unlock(&box_table_lock);
 	free(box);
 
 	return 0;
@@ -101,8 +101,8 @@ int box_alloc(box_t *box, char *box_name) {
 	mutex_lock(&box->content_mutex);
 	box->path = (char*) myalloc(sizeof(char) * TFS_BOX_PATH_LEN);
 	memset(box->path, 0, TFS_BOX_PATH_LEN * sizeof(char));
-	box->path[0] = "/";
-	box->name = box->path[1];
+	*(box->path) = '/';
+	*(box->name) = box->path[1];
 	memcpy(box->name, box_name, MAX_BOX_NAME - 1);
 	box->n_publishers = 0;
 	box->n_subscribers = 0;
@@ -152,7 +152,7 @@ box_t *add_sub_to_box(char *box_name) {
 	return box;
 }
 
-void data_kill() {
+/* void data_kill() {
 	pcq_destroy(queue);
 	free(queue);
-}
+} */

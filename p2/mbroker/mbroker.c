@@ -89,15 +89,17 @@ int handle_register_subscriber(session_t *current) {
 	if ((cp_fd = open(current->pipe_name, O_WRONLY)) == -1) {
 		return -1;
 	}
-	if ((tfs_fd = tfs_open(box->path, NULL)) == -1) {
-		close(cp_fd);
-		return -1;
-	}
+
 	if ((box = add_sub_to_box(current->box_name)) == 0) {
 		close(cp_fd);
-		tfs_close(tfs_fd);
 		return -1;
 	}
+	
+	if ((tfs_fd = tfs_open(box->path, TFS_O_CREAT)) == -1) {
+		close(cp_fd);
+		return -1;
+	}
+
 
 	while (true) {
 		ssize_t ret;
@@ -129,7 +131,7 @@ int handle_register_subscriber(session_t *current) {
 uint8_t *build_subscriber_response(char *message) {
 	uint8_t code = SUBSCRIBER_RESPONSE_CODE;
 	size_t size = SUBSCRIBER_RESPONSE_SIZE;
-	uint8_t response = (uint8_t*) myalloc(size);
+	uint8_t* response = (uint8_t*) myalloc(size);
 	memset(response, 0, size);
 	size_t offset = 0;
 
@@ -147,13 +149,14 @@ int handle_register_publisher(session_t *current) {
 	if ((cp_fd = open(current->pipe_name, O_RDONLY)) == -1) {
 		return -1;
 	}
-	if ((tfs_fd = tfs_open(box->path, TFS_O_APPEND)) == -1) {
+	
+	if ((box = add_pub_to_box(current->box_name)) == 0) {
 		close(cp_fd);
 		return -1;
 	}
-	if ((box = add_pub_to_box(current->box_name)) == 0) {
+
+	if ((tfs_fd = tfs_open(box->path, TFS_O_APPEND)) == -1) {
 		close(cp_fd);
-		tfs_close(tfs_fd);
 		return -1;
 	}
 
@@ -203,7 +206,7 @@ int handle_register_publisher(session_t *current) {
 	return 0;
 }
 
-int handle_create_box(session_t *current) {
+/* int handle_create_box(session_t *current) {
 	int ret;
 	int32_t ret_code = 0;
 	int cp_fd;
@@ -224,11 +227,13 @@ int handle_create_box(session_t *current) {
 		case -2:
 			SET_ERROR(error_msg, "Max amount of boxes reached!", ret_code);
 			break;
+		default:
+			break;
 	}
 	send_request(cp_fd, build_create_box_response(
 			ret_code, error_msg), SUBSCRIBER_RESPONSE_SIZE);
 	return ret;
-}
+} */
 
 void process_sessions() {
 	while (true) {
@@ -244,7 +249,7 @@ void process_sessions() {
 				handle_register_subscriber(current);
 				break;
 			case 3:
-				handle_create_box(current);
+				/* handle_create_box(current); */
 				break;
 			default:
 				PANIC("Invalid code reached worker thread.");

@@ -8,5 +8,6 @@
 
 void listen_for_requests(char* pipe_name);
 int handle_register_publisher(session_t *current);
+uint8_t *build_subscriber_response(char *message);
 
 #endif
