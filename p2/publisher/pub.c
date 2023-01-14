@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
         printf("Unable to send request to server\n");
         return -1;
     }
-
+	printf("MANDEI\n");
 	// Waits for pipe to be opened server-side
 	if ((fd = open(pipe_name, O_WRONLY)) == -1) {
 		close(rp_fd);

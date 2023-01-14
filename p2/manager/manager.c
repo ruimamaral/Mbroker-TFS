@@ -50,6 +50,7 @@ int main(int argc, char **argv) {
 			pipe_name, O_RDONLY) != -1, "Could not open client pipe.");
 
 	read_pipe(cp_fd, response, MANAGER_RESPONSE_SIZE);
+	printf("%s\n",response);
 	
     return -1;
 }

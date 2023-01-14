@@ -31,8 +31,9 @@ void listen_for_requests(char* pipe_name) {
 	if ((dummy_pipe = open(pipe_name, O_WRONLY)) == -1) {
 		PANIC("Cannot open dummy pipe - aborting.")
 	}
-
+	printf("WHAT\n");
 	while(true) {
+		printf("WTF");
 		ses = (session_t*) myalloc(sizeof(session_t));
 		read_pipe(server_pipe, &ses->code, sizeof(uint8_t));
 		read_pipe(server_pipe, ses->pipe_name,sizeof(char) * CLIENT_PIPE_LENGTH);
@@ -47,15 +48,19 @@ void listen_for_requests(char* pipe_name) {
 			case 5:
 				read_pipe(server_pipe, ses->box_name,
 						sizeof(char) * MAX_BOX_NAME);
+				printf("Recebi\n");
 				break;
 
 			default:
 				// Invalid code.
 				PANIC("Invalid code read by server.")
 		}
-
+		printf("Makes no sense\n");
+		printf("code->%u|pathname->%s|box_name->%s\n",ses->code,ses->pipe_name,ses->box_name);
 		// Signal to workers.
-		/* pcq_enqueue(queue, &session); */
+		pcq_enqueue(queue, ses);
+		
+		printf("code-> %u ||| pipe_name-> %s ||| box_name-> %s\n",((session_t*)(queue->pcq_buffer[0]))->code,((session_t*)(queue->pcq_buffer[0]))->pipe_name,((session_t*)(queue->pcq_buffer[0]))->box_name);
 	}
 } 
 
@@ -63,7 +68,7 @@ int main(int argc, char **argv) {
     ALWAYS_ASSERT(argc == 3, "Invalid arguments.");
 	int max_sessions = atoi(argv[2]);
 	ALWAYS_ASSERT(max_sessions > 0, "Invalid session number\n");
-	/* pthread_t worker_threads[max_sessions]; */
+	pthread_t worker_threads[max_sessions];
 	unlink(argv[1]);
 	
 	ALWAYS_ASSERT(mkfifo(argv[1], 0777) != -1, "Cannot create register pipe");
@@ -71,12 +76,11 @@ int main(int argc, char **argv) {
 	ALWAYS_ASSERT(!tfs_init(NULL), "Cannot initialize tfs.");
 
 	data_init();
-
 	printf("Passei do pcq_create\n");
 
-	/* for(i = 0; i < argv[2]; i++) {
+	for(int i = 0; i < max_sessions; i++) {
 		pthread_create(&worker_threads[i], NULL, &process_sessions, NULL);
-	}  */
+	}
 
 	listen_for_requests(argv[1]);
 	return 0;
@@ -90,7 +94,8 @@ int handle_register_subscriber(session_t *current) {
 		return -1;
 	}
 
-	if ((box = add_sub_to_box(current->box_name)) == 0) {
+	
+	 if ((box = add_sub_to_box(current->box_name)) == 0) {
 		close(cp_fd);
 		return -1;
 	}
@@ -141,15 +146,19 @@ uint8_t *build_subscriber_response(char *message) {
 }
 
 int handle_register_publisher(session_t *current) {
-	box_t *box;
+	/* box_t *box; */
 	int cp_fd;
-	int tfs_fd; 
+	/* int tfs_fd;  */
 	printf("HEYYY\n");
 	if ((cp_fd = open(current->pipe_name, O_RDONLY)) == -1) {
 		return -1;
 	}
+
+	create_box(current->box_name);
+	box_t* box = fetch_box(current->box_name);
+	printf("box_path->%s||box_name->%s\n",box->path,box->name);
 	
-	if ((box = add_pub_to_box(current->box_name)) == 0) {
+	/* if ((box = add_pub_to_box(current->box_name)) == 0) {
 		close(cp_fd);
 		return -1;
 	}
@@ -157,7 +166,7 @@ int handle_register_publisher(session_t *current) {
 	if ((tfs_fd = tfs_open(box->path, TFS_O_APPEND)) == -1) {
 		close(cp_fd);
 		return -1;
-	}
+	} */
 
 	while (true) {
 		uint8_t code;
@@ -188,19 +197,19 @@ int handle_register_publisher(session_t *current) {
 			break;
 		}
 		printf("MESSAGE_RECEIVED[%s]\n",message);
-		ret = tfs_write(tfs_fd, message, MAX_MSG_LENGTH);
+		/* ret = tfs_write(tfs_fd, message, MAX_MSG_LENGTH);
 		if (ret < MAX_MSG_LENGTH) {
 			break; // Box ran out of space or write failed
 		}
 		// Signal subs
-		cond_broadcast(&box->condvar);
+		cond_broadcast(&box->condvar); */
 	}
 	close(cp_fd);
-	tfs_close(tfs_fd);
+	/* tfs_close(tfs_fd); */
 
-	mutex_lock(&box->content_mutex);
+	/* mutex_lock(&box->content_mutex);
 	box->n_publishers--;
-	mutex_unlock(&box->content_mutex);
+	mutex_unlock(&box->content_mutex); */
 
 	return 0;
 }
@@ -221,9 +230,9 @@ uint8_t *build_create_box_response(int32_t ret_code, char *error_msg) {
 
 int handle_create_box(session_t *current) {
 	int ret;
-	int32_t ret_code = 0;
+	/* int32_t ret_code = 0;  */
 	int cp_fd;
-	char *error_msg = (char*) myalloc(ERROR_MSG_LEN * sizeof(char));
+	void *error_msg = (void*) myalloc(ERROR_MSG_LEN * sizeof(char));
 	memset(error_msg, 0, ERROR_MSG_LEN * sizeof(char));
 
 	if ((cp_fd = open(current->pipe_name, O_WRONLY)) == -1) {
@@ -232,7 +241,7 @@ int handle_create_box(session_t *current) {
 
 	ret = create_box(current->box_name);
 
-	switch (ret) {
+	/* switch (ret) {
 		case 0:
 			break;
 		case -1:
@@ -248,15 +257,16 @@ int handle_create_box(session_t *current) {
 			return -1;
 	}
 	send_request(cp_fd, build_create_box_response(
-			ret_code, error_msg), MANAGER_RESPONSE_SIZE);
+			ret_code, error_msg), MANAGER_RESPONSE_SIZE); */
 	return ret;
 } 
 
-void process_sessions() {
+void* process_sessions() {
 	while (true) {
 		// If queue is empty, waits for a producer signal.
 		session_t *current = (session_t*) pcq_dequeue(queue);
-
+		printf("process_sessions->saiu da queue\n");
+		printf("code->%u|pathname->%s|box_name->%s\n",current->code,current->pipe_name,current->box_name);
 		// Pick handler function for each type of session
 		switch (current->code) {
 			case PUB_CREATION_CODE:

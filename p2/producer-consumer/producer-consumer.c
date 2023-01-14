@@ -1,6 +1,6 @@
 #include "producer-consumer.h"
 #include "locks.h"
-#include "pipeutils.h"
+#include "pipeutils.h" 							
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,6 +42,7 @@ int pcq_create(pc_queue_t *queue, size_t capacity) {
 // If the queue is full, sleep until the queue has space
 int pcq_enqueue(pc_queue_t *queue, void *elem) {
 	// Lock does not allow two pushers running at the same time.
+	printf("ENTREI\n");
 	mutex_lock(&queue->pcq_pusher_condvar_lock);
 	mutex_lock(&queue->pcq_current_size_lock);
 	while (queue->pcq_current_size == queue->pcq_capacity) {
@@ -51,6 +52,7 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
 		cond_wait(&queue->pcq_pusher_condvar, &queue->pcq_pusher_condvar_lock);
 		mutex_lock(&queue->pcq_current_size_lock);
 	}
+	printf("Sai da espera\n");
 	queue->pcq_current_size++;
 	mutex_unlock(&queue->pcq_current_size_lock);
 
@@ -61,7 +63,7 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
 	mutex_unlock(&queue->pcq_pusher_condvar_lock);
 
 	mutex_lock(&queue->pcq_popper_condvar_lock);
-	cond_signal(&queue->pcq_popper_condvar);
+	cond_broadcast(&queue->pcq_popper_condvar);
 	mutex_unlock(&queue->pcq_popper_condvar_lock);
 
 	return 0;
@@ -90,7 +92,7 @@ void *pcq_dequeue(pc_queue_t *queue) {
 	mutex_unlock(&queue->pcq_popper_condvar_lock);
 
 	mutex_lock(&queue->pcq_pusher_condvar_lock);
-	cond_signal(&queue->pcq_pusher_condvar);
+	cond_broadcast(&queue->pcq_pusher_condvar);
 	mutex_unlock(&queue->pcq_pusher_condvar_lock);
 
 	return ret;

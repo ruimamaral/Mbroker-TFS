@@ -12,7 +12,7 @@ pthread_mutex_t box_table_lock;
 
 int data_init() {
 	server_boxes = (box_t**) myalloc(sizeof(box_t*) * DEFAULT_BOX_LIMIT);
-	queue = (pc_queue_t*) myalloc(sizeof(pc_queue_t*));
+	queue = (pc_queue_t*) myalloc(sizeof(pc_queue_t));
 	pcq_create(queue, DEFAULT_QUEUE_LENGTH);
 	memset(server_boxes, 0, DEFAULT_BOX_LIMIT);
 	mutex_init(&box_table_lock);
@@ -49,25 +49,32 @@ int create_box(char *box_name) {
 		box = server_boxes[i];
 		if (box && !strcmp(box->name, box_name)) {
 			// Box already exists
+			printf("NO->1\n");
 			return -1;
 		}
 		if (!box && slot < 0) {
 			// First empty slot
+			printf("NO->2\n");
 			slot = i;
 		}
 	}
 	if (slot < 0) {
 		// No space
+		printf("NO->3\n");
 		return -2;
 	}
 	box = (box_t*) myalloc(sizeof(box_t));
 	if (!box_alloc(box, box_name)) {
 		// Could not allocate box
+		printf("NO->4\n");
 		free(box);
 		return -3;
 	}
+	printf("CREATE BEFORE |||| box_path->%s||box_name->%s\n",box->path,box->name);
 	server_boxes[slot] = box;
+	printf("CREATE |||| box_path->%s||box_name->%s\n",server_boxes[slot]->path,server_boxes[slot]->name);
 	mutex_unlock(&box_table_lock);
+	printf("YES\n");
 	return 0;
 }
 
@@ -101,9 +108,9 @@ int box_alloc(box_t *box, char *box_name) {
 	mutex_lock(&box->content_mutex);
 	box->path = (char*) myalloc(sizeof(char) * TFS_BOX_PATH_LEN);
 	memset(box->path, 0, TFS_BOX_PATH_LEN * sizeof(char));
-	*(box->path) = '/';
-	*(box->name) = box->path[1];
-	memcpy(box->name, box_name, MAX_BOX_NAME - 1);
+	box->path[0] = '/';
+	box->name = box->path[1];
+	memcpy(box->path, box_name, MAX_BOX_NAME - 1);
 	box->n_publishers = 0;
 	box->n_subscribers = 0;
 	//box->status = OPEN;

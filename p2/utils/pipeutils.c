@@ -28,7 +28,7 @@ ssize_t write_pipe(int fd, void const *buffer, size_t buffer_size) {
 
 ssize_t read_pipe(int fd, void *buffer, size_t buffer_size) {
     ssize_t ret = read(fd, buffer, buffer_size);
-	ALWAYS_ASSERT(ret > 0, "read from pipe failed");
+	ALWAYS_ASSERT(ret >= 0, "read from pipe failed");
 
 	return ret;
 }
