@@ -42,7 +42,8 @@ void *publish_request(char *message) {
 }
 
 
-/// @brief Waits for input and sends a message request if an /n or EOF is inputted(closing the process with the latest)
+/// @brief Waits for input and sends a message request if an /n	or EOF
+///	is inputted (closing the process with the latest)
 /// @param fd client pipe's file descriptor
 void process_messages(int fd) {
 	char buffer[MAX_MSG_LENGTH];
@@ -68,7 +69,8 @@ void process_messages(int fd) {
 		}
 		printf("what\n");
 		len = 0;
-		if (send_request(fd, publish_request(buffer),MAX_MSG_LENGTH) < 0) { // creates and writes the message request in the pipe
+ 		// creates and writes the message request in the pipe
+		if (send_request(fd, publish_request(buffer),MAX_MSG_LENGTH) < 0) {
 			return;
 		}
 		printf("MESSAGE_SENT[%s]\n",buffer);
@@ -83,7 +85,8 @@ void process_messages(int fd) {
 /// @brief 
 /// @param pipe_name 
 /// @param box_name 
-/// @return the request shape [ code = 1 (uint8_t) | [ client_named_pipe_path (char[256]) ] | [ box_name (char[32]) ]
+/// @return the request shape [ code = 1 (uint8_t) |
+///	[ client_named_pipe_path (char[256]) ] | [ box_name (char[32]) ]
 void *creation_request(char *pipe_name, char *box_name) {
 	size_t request_len = sizeof(uint8_t)
 			+ (BOX_NAME_LENGTH + CLIENT_PIPE_LENGTH) * sizeof(char);
@@ -121,7 +124,7 @@ int main(int argc, char **argv) {
 	unlink(pipe_name);
 
 	if (mkfifo(pipe_name, 0777) == -1) {
-        printf("Unable to send create client pipe\n");
+        printf("Unable to create client pipe\n");
         return -1;
     }
 

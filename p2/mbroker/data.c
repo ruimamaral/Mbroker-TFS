@@ -58,13 +58,13 @@ int create_box(char *box_name) {
 	}
 	if (slot < 0) {
 		// No space
-		return -1;
+		return -2;
 	}
 	box = (box_t*) myalloc(sizeof(box_t));
 	if (!box_alloc(box, box_name)) {
 		// Could not allocate box
 		free(box);
-		return -1;
+		return -3;
 	}
 	server_boxes[slot] = box;
 	mutex_unlock(&box_table_lock);
@@ -90,7 +90,7 @@ int box_remove(char* box_name) {
 
 int box_alloc(box_t *box, char *box_name) {
 	int ret;
-	if ((ret = tfs_open(box_name, TFS_O_CREAT)) == -1) {
+	if ((ret = tfs_open(box_name, TFS_O_CREAT & TFS_O_TRUNC)) == -1) {
 		return -1;
 	}
 	tfs_close(ret); // close the file we just opened

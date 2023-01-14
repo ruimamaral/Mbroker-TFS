@@ -41,9 +41,9 @@ void listen_for_requests(char* pipe_name) {
 				// List boxes request (doesn't have box_name parameter)
 				break;
 
-			case 1:
-			case 2:
-			case 3:
+			case PUB_CREATION_CODE:
+			case SUB_CREATION_CODE:
+			case MANAGER_CREATE_CODE:
 			case 5:
 				read_pipe(server_pipe, ses->box_name,
 						sizeof(char) * MAX_BOX_NAME);
@@ -99,7 +99,6 @@ int handle_register_subscriber(session_t *current) {
 		close(cp_fd);
 		return -1;
 	}
-
 
 	while (true) {
 		ssize_t ret;
@@ -206,12 +205,27 @@ int handle_register_publisher(session_t *current) {
 	return 0;
 }
 
-/* int handle_create_box(session_t *current) {
+uint8_t *build_create_box_response(int32_t ret_code, char *error_msg) {
+	uint8_t code = MANAGER_CREATE_RESPONSE_CODE;
+	size_t size = MANAGER_RESPONSE_SIZE;
+	uint8_t* response = (uint8_t*) myalloc(size);
+	memset(response, 0, size);
+	size_t offset = 0;
+
+    requestcpy(response, &offset, &code, sizeof(uint8_t));
+	requestcpy(response, &offset, &ret_code, sizeof(int32_t));
+    requestcpy(response, &offset, error_msg, ERROR_MSG_LEN * sizeof(char));
+	free(error_msg);
+	return response;
+}
+
+int handle_create_box(session_t *current) {
 	int ret;
 	int32_t ret_code = 0;
 	int cp_fd;
-	char *error_msg = NULL;
+	char *error_msg = (char*) myalloc(ERROR_MSG_LEN * sizeof(char));
 	memset(error_msg, 0, ERROR_MSG_LEN * sizeof(char));
+
 	if ((cp_fd = open(current->pipe_name, O_WRONLY)) == -1) {
 		return -1;
 	}
@@ -222,18 +236,21 @@ int handle_register_publisher(session_t *current) {
 		case 0:
 			break;
 		case -1:
-			SET_ERROR(error_msg, "Box already exists!", ret_code);
+			SET_ERROR(error_msg, ERR_BOX_EXISTS, ret_code);
 			break;
 		case -2:
-			SET_ERROR(error_msg, "Max amount of boxes reached!", ret_code);
+			SET_ERROR(error_msg, ERR_TOO_MANY_BOXES, ret_code);
+			break;
+		case -3:
+			SET_ERROR(error_msg, ERR_TFS_FAIL, ret_code);
 			break;
 		default:
-			break;
+			return -1;
 	}
 	send_request(cp_fd, build_create_box_response(
-			ret_code, error_msg), SUBSCRIBER_RESPONSE_SIZE);
+			ret_code, error_msg), MANAGER_RESPONSE_SIZE);
 	return ret;
-} */
+} 
 
 void process_sessions() {
 	while (true) {
@@ -242,14 +259,14 @@ void process_sessions() {
 
 		// Pick handler function for each type of session
 		switch (current->code) {
-			case 1:
+			case PUB_CREATION_CODE:
 				handle_register_publisher(current);
 				break;
-			case 2:
+			case SUB_CREATION_CODE:
 				handle_register_subscriber(current);
 				break;
-			case 3:
-				/* handle_create_box(current); */
+			case MANAGER_CREATE_CODE:
+				handle_create_box(current);
 				break;
 			default:
 				PANIC("Invalid code reached worker thread.");
