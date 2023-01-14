@@ -32,8 +32,21 @@
 #define ERR_TOO_MANY_BOXES "Max amount of boxes reached!"
 #define ERR_TFS_FAIL "Could not create file in tfs!"
 
+#define MANAGER_BOX_CREATE "create"
+#define MANAGER_BOX_REMOVE "remove"
+#define MANAGER_BOX_LIST "list"
+
+
 #define MANAGER_CREATE_CODE 3
 #define MANAGER_CREATE_RESPONSE_CODE 4
+
+#define MANAGER_REMOVE_CODE 5
+#define MANAGER_REMOVE_RESPONSE_CODE 6
+
+#define MANAGER_LIST_CODE 7
+#define MANAGER_LIST_RESPONSE_CODE 8
+
+
 #define MANAGER_RESPONSE_SIZE (sizeof(char) * ERROR_MSG_LEN \
 		+ sizeof(int32_t) + sizeof(uint8_t))
 
@@ -42,8 +55,7 @@
 	code = -1; \
 }
 
-void requestcpy(void *request,
-		size_t *request_offset, void *data, size_t size);
+void requestcpy(void *request,size_t *request_offset, void *data, size_t size);
 
 ssize_t write_pipe(int fd, void const *buffer,size_t buffer_size);
 
