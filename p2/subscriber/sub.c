@@ -38,7 +38,7 @@ uint8_t* creation_request(char *pipe_name, char *box_name) {
 
 int subscribe(int fd) {
 	uint8_t code;
-	char buffer[MAX_MSG_LENGTH];
+	char message[MAX_MSG_LENGTH];
 	while (true) {
 		ssize_t ret = read_pipe(fd, &code, sizeof(uint8_t));
 		if (code == 0) {
@@ -48,17 +48,17 @@ int subscribe(int fd) {
 		ALWAYS_ASSERT(code ==
 				SUBSCRIBER_RESPONSE_CODE, "Unexpected code received.");
 
-		ret = read_pipe(fd, buffer, sizeof(buffer));
+		ret = read_pipe(fd, message, MAX_MSG_LENGTH * sizeof(char));
 		if (ret == 0) {
 			// Pipe closed
 			break;
 		}
-		printf("%s\n", buffer);
-		memset(buffer, 0, MAX_MSG_LENGTH);
+		// Print the message
+		fprintf(stdout, "%s\n", message);
+		memset(message, 0, MAX_MSG_LENGTH);
 	}
 	return 0;
 }
-
 
 int main(int argc, char **argv) {
    	int rp_fd;
@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
 
 	ALWAYS_ASSERT(subscribe(fd) != -1, "Unexpected code received");
 
-	printf("Server ended the session.\n");
+	printf("Server ended/rejected the session.\n");
 
 	destroy(pipe_name, fd, rp_fd);
 

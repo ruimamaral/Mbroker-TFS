@@ -244,6 +244,7 @@ int handle_register_publisher(session_t *current) {
 			break; // Box ran out of space or write failed
 		}
 		mutex_lock(&box->content_mutex);
+		box->box_size += ret;
 		// Signal subs
 		cond_broadcast(&box->condvar);
 		mutex_unlock(&box->content_mutex);

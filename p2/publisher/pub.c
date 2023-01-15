@@ -25,7 +25,7 @@ void destroy(char *pipe_name, int fd, int rp_fd) {
 /// @brief creates message request
 /// @param message 
 /// @return the message request
-uint8_t* publish_request(char *message) {
+uint8_t* build_publish_request(char *message) {
 	printf("entrei no publish\n");
 	size_t request_len = sizeof(uint8_t) + MAX_MSG_LENGTH * sizeof(char);
 
@@ -41,17 +41,17 @@ uint8_t* publish_request(char *message) {
 
 }
 
-
 /// @brief Waits for input and sends a message request if an /n	or EOF
 ///	is inputted (closing the process with the latest)
 /// @param fd client pipe's file descriptor
 void process_messages(int fd) {
 	char buffer[MAX_MSG_LENGTH];
-	int len = 0;
+	int len;
 	char c;
-	memset(buffer, 0, MAX_MSG_LENGTH);
 
 	while (true) {
+		len = 0;
+		memset(buffer, 0, MAX_MSG_LENGTH);
 		while ((c = (char)getchar()) != '\n') {
 			if (c == EOF) {
 				break;
@@ -68,15 +68,17 @@ void process_messages(int fd) {
 			}
 			buffer[len++] = c;
 		}
-		printf("what\n");
-		len = 0;
- 		// creates and writes the message request in the pipe
-		send_request(fd, publish_request(buffer),MAX_MSG_LENGTH);
-		printf("MESSAGE_SENT[%s]\n",buffer);
+		// Checks if the message is empty
+		if (len > 0) {
+			// creates and writes the message request in the pipe
+			send_request(fd, build_publish_request(
+					buffer), MAX_MSG_LENGTH * sizeof(char));
+		}
+		// If the user has sent an EOF signal, we stop reading more messages
+		// and terminate the process.
 		if (c == EOF) {
 			break;
 		}
-		memset(buffer, 0, MAX_MSG_LENGTH);
 	}
 }
 
@@ -102,8 +104,6 @@ uint8_t* creation_request(char *pipe_name, char *box_name) {
 	return request;
 }
 
-
-
 /// @brief Receives information, and proceeds to send a Request with the format
 /// 		[ code = 1 (uint8_t) | [ client_named_pipe_path (char[256]) ]
 ///			| [ box_name (char[32]) ] and if accepted sends messages
@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
 	ALWAYS_ASSERT(mkfifo(
 			pipe_name, 0777) != -1, "Unable to create client pipe");
 
-	//opens the server's pipe on write mode
+	// opens the server's pipe in write mode
 	ALWAYS_ASSERT((rp_fd = open(
 			argv[1], O_WRONLY)) != -1, "Unable to open server pipe");
 
@@ -139,6 +139,8 @@ int main(int argc, char **argv) {
 			pipe_name, O_WRONLY)) != -1, "Cannot open pipe.");
 
 	process_messages(fd);
+
+	printf("Server ended/rejected the session.\n");
 
 	destroy(pipe_name, fd, rp_fd);
 

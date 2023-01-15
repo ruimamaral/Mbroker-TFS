@@ -194,9 +194,9 @@ int box_init(box_t *box) {
 	box->n_subscribers = 0;
 	box->box_size = 0;
 	box->status = NORMAL;
-	box->pub_pipe_name = NULL;
 
 	memset(box->name, 0, MAX_BOX_NAME * sizeof(char));
+	memset(box->pub_pipe_name, 0, CLIENT_PIPE_LENGTH * sizeof(char));
 
 	return 0;
 }
