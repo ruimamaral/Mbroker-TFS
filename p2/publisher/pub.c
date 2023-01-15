@@ -1,5 +1,6 @@
 #include "logging.h"
 #include "pipeutils.h"
+#include "betterassert.h"
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>

@@ -85,7 +85,7 @@ int handle_create_remove(int rp_fd,
 }
 
 int parse_node(int cp_fd, box_node_t *node) {
-	uint8_t code;
+	uint8_t code = 0;
 	read_pipe(cp_fd, &code, sizeof(uint8_t));
 	ALWAYS_ASSERT(code ==
 			MANAGER_LIST_RESPONSE_CODE, "Unexpected code read from pipe.");
@@ -148,7 +148,6 @@ box_node_t* process_list_response(int cp_fd) {
 int handle_list(int rp_fd, char* pipe_name) {
 
 	int cp_fd;
-	// TEMP Está a dar erro aqui no meu, não sei porquê tho
 	send_request(rp_fd, build_list_request(pipe_name), REQUEST_NO_BOX_SIZE);
 
 	ALWAYS_ASSERT(cp_fd = open(

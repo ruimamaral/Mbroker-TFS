@@ -197,7 +197,7 @@ int handle_register_publisher(session_t *current) {
 		uint8_t code;
 		ssize_t ret;
 		char message[MAX_MSG_LENGTH];
-		ret = read_pipe(cp_fd, &code, sizeof(u_int8_t));
+		ret = read_pipe(cp_fd, &code, sizeof(uint8_t));
 		// Lock to prevent signal leakage and/or data races from accessing box.
 		mutex_lock(&box->content_mutex);
 		// Checks if the box is undergoing the process of removal.
