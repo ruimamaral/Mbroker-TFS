@@ -49,6 +49,6 @@ box_t **box_get_all(size_t *amount);
 box_t *box_add_sub(char *box_name);
 box_t *box_add_pub(char *box_name);
 void box_kill(box_t* box);
-void data_kill();
+int data_kill();
 
 #endif

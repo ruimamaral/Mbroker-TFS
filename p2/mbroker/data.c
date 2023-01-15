@@ -283,7 +283,7 @@ void box_kill(box_t* box) {
 	mutex_kill(&box->content_mutex);
 }
 
-void data_kill() {
+int data_kill() {
 	pcq_destroy(queue);
 	free(queue);
 	mutex_lock(&box_table_lock);
@@ -300,4 +300,5 @@ void data_kill() {
 	free(server_boxes);
 	mutex_unlock(&box_table_lock);
 	mutex_kill(&box_table_lock);
+	return 0;
 }

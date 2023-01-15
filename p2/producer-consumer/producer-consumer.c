@@ -42,6 +42,8 @@ int pcq_destroy(pc_queue_t *queue) {
 	mutex_kill(&queue->pcq_tail_lock);
 	mutex_kill(&queue->pcq_pusher_condvar_lock);
 	mutex_kill(&queue->pcq_popper_condvar_lock);
+
+	return 0;
 }
 
 // pcq_enqueue: insert a new element at the front of the queue

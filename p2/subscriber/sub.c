@@ -48,12 +48,18 @@ int subscribe(int fd) {
 	char message[MAX_MSG_LENGTH];
 	int count = 0;
 	while (true) {
-		if (sigint_status == SIGINT) {
-			fprintf(stdout, "MESSAGES RECEIVED:\n");
-			fprintf(stdout, "%d\n", count);
-			break;
+
+		ssize_t ret = read(fd, &code, sizeof(uint8_t));
+
+		if (ret < 0) {
+			if (sigint_status == SIGINT) {
+				fprintf(stdout, "MESSAGES RECEIVED:\n");
+				fprintf(stdout, "%d\n", count);
+				break;
+			}
+			PANIC("Bad read from pipe;")
 		}
-		ssize_t ret = read_pipe(fd, &code, sizeof(uint8_t));
+
 		if (code == 0) {
 			// Pipe closed
 			break;
