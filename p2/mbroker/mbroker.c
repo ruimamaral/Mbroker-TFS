@@ -65,7 +65,7 @@ void listen_for_requests(char* pipe_name) {
 } 
 
 int main(int argc, char **argv) {
-    ALWAYS_ASSERT(argc == 3, "Invalid arguments.");
+	ALWAYS_ASSERT(argc == 3, "Invalid arguments.");
 	int max_sessions = atoi(argv[2]);
 	ALWAYS_ASSERT(max_sessions > 0, "Invalid session number\n");
 	pthread_t worker_threads[max_sessions];
@@ -367,11 +367,10 @@ int handle_list_boxes(session_t* current) {
 	size_t box_amount;
 	box_t **boxes;
 	int cp_fd;
-	printf("ainda nao abri\n");
+
 	if ((cp_fd = open(current->pipe_name, O_WRONLY)) == -1) {
 		return -1;
 	}
-	printf("ABRI\n");
 	boxes = box_get_all(&box_amount);
 
 	if (box_amount == 0) {
