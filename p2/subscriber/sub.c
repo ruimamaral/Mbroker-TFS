@@ -1,6 +1,7 @@
 #include "logging.h"
 #include "pipeutils.h"
 #include "betterassert.h"
+#include <signal.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -11,6 +12,12 @@
 #include <unistd.h>
 #include <stdint.h>
 
+
+volatile sig_atomic_t sigint_status = 0;
+
+void handle_sigint(int status) {
+	sigint_status = status;
+}
 
 void destroy(char *pipe_name, int fd, int rp_fd) {
 	close(fd);
@@ -39,7 +46,13 @@ uint8_t* creation_request(char *pipe_name, char *box_name) {
 int subscribe(int fd) {
 	uint8_t code;
 	char message[MAX_MSG_LENGTH];
+	int count = 0;
 	while (true) {
+		if (sigint_status == SIGINT) {
+			fprintf(stdout, "MESSAGES RECEIVED:\n");
+			fprintf(stdout, "%d\n", count);
+			break;
+		}
 		ssize_t ret = read_pipe(fd, &code, sizeof(uint8_t));
 		if (code == 0) {
 			// Pipe closed
@@ -55,6 +68,7 @@ int subscribe(int fd) {
 		}
 		// Print the message
 		fprintf(stdout, "%s\n", message);
+		count++;
 		memset(message, 0, MAX_MSG_LENGTH);
 	}
 	return 0;
@@ -63,12 +77,17 @@ int subscribe(int fd) {
 int main(int argc, char **argv) {
    	int rp_fd;
 	int fd;
-	char* pipe_name = argv[2];
+	char *pipe_name = argv[2];
+	char *box_name = argv[3];
+
+	ALWAYS_ASSERT(signal(SIGINT, handle_sigint) !=
+			SIG_ERR, "Error while assigning signal handler.");
 
     ALWAYS_ASSERT(argc == 4, "Invalid arguments.");
+
     ALWAYS_ASSERT(strlen(pipe_name) < 256,
 			"Pipe name should have less than 256 characters.");
-    ALWAYS_ASSERT(strlen(argv[3]) < 32,
+    ALWAYS_ASSERT(strlen(box_name) < 32,
 			"Box name should have less than 32 characters.");
 
 	ALWAYS_ASSERT(mkfifo(
@@ -78,7 +97,7 @@ int main(int argc, char **argv) {
 			argv[1], O_WRONLY)) != -1, "Unable to open server pipe");
 
     send_request(rp_fd,
-			creation_request(pipe_name, argv[3]), REQUEST_WBOX_SIZE);
+			creation_request(pipe_name, box_name), REQUEST_WBOX_SIZE);
 
 	// Waits for pipe to be opened server-side
 	ALWAYS_ASSERT((fd = open(

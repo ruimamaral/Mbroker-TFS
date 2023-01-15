@@ -30,13 +30,20 @@ int pcq_create(pc_queue_t *queue, size_t capacity) {
 // pcq_destroy: releases the internal resources of the queue
 //
 // Memory: does not free the queue pointer itself
+int pcq_destroy(pc_queue_t *queue) {
 
+	free(queue->pcq_buffer);
 
-/* int pcq_destroy(pc_queue_t *queue) {
+	cond_kill(&queue->pcq_popper_condvar);
+	cond_kill(&queue->pcq_pusher_condvar);
 
+	mutex_kill(&queue->pcq_current_size_lock);
+	mutex_kill(&queue->pcq_head_lock);
+	mutex_kill(&queue->pcq_tail_lock);
+	mutex_kill(&queue->pcq_pusher_condvar_lock);
+	mutex_kill(&queue->pcq_popper_condvar_lock);
 }
 
- */
 // pcq_enqueue: insert a new element at the front of the queue
 //
 // If the queue is full, sleep until the queue has space

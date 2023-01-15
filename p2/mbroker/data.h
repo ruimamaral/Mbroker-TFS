@@ -42,12 +42,13 @@ int data_init();
 int box_init(box_t *box);
 box_t *fetch_box(char *name);
 int box_remove(char* box_name);
-void box_kill(box_t* box);
 int find_box(char *name);
 int box_create(char *name);
 int box_alloc(box_t *box);
 box_t **box_get_all(size_t *amount);
 box_t *box_add_sub(char *box_name);
 box_t *box_add_pub(char *box_name);
+void box_kill(box_t* box);
+void data_kill();
 
 #endif

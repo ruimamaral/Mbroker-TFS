@@ -204,6 +204,7 @@ int handle_register_publisher(session_t *current) {
 		uint8_t code;
 		ssize_t ret;
 		char message[MAX_MSG_LENGTH];
+
 		ret = read_pipe(cp_fd, &code, sizeof(uint8_t));
 		printf("handle_publisher read_code->%zu",ret);
 		printf("handle_publisher readcode->%u\n",code);
@@ -221,7 +222,6 @@ int handle_register_publisher(session_t *current) {
 			return 0;
 		}
 		mutex_unlock(&box->content_mutex);
-
 
 		if (ret == 0) {
 			// Pipe closed
@@ -244,7 +244,7 @@ int handle_register_publisher(session_t *current) {
 			break; // Box ran out of space or write failed
 		}
 		mutex_lock(&box->content_mutex);
-		box->box_size += ret;
+		box->box_size += (uint64_t) ret;
 		// Signal subs
 		cond_broadcast(&box->condvar);
 		mutex_unlock(&box->content_mutex);
@@ -355,9 +355,10 @@ int handle_remove_box(session_t* current) {
 	close(cp_fd);
 	return ret;
 }
+
 uint8_t *build_list_boxes_response(uint8_t last, box_t* box) {
 	uint8_t code = MANAGER_LIST_RESPONSE_CODE;
-	size_t size = MANAGER_LIST_RESPOND_SIZE;
+	size_t size = MANAGER_LIST_RESPONSE_SIZE;
 	uint8_t* response = (uint8_t*) myalloc(size);
 	memset(response, 0, size);
 	size_t offset = 0;
@@ -406,7 +407,7 @@ int handle_list_boxes(session_t* current) {
 			last = 1;
 		}
 		send_request(cp_fd, build_list_boxes_response(
-				last, boxes[i]), MANAGER_LIST_RESPOND_SIZE);
+				last, boxes[i]), MANAGER_LIST_RESPONSE_SIZE);
 		free(boxes[i]);
 	}
 	free(boxes);

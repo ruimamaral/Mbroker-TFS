@@ -217,15 +217,6 @@ int box_alloc(box_t *box) {
 	return 0;
 }
 
-void box_kill(box_t* box) {
-	mutex_lock(&box->content_mutex);
-	free(box->path);
-	free(box->pub_pipe_name);
-	cond_kill(&box->condvar);
-	mutex_unlock(&box->content_mutex);
-	mutex_kill(&box->content_mutex);
-}
-
 box_t **box_get_all(size_t *amount) {
 	mutex_lock(&box_table_lock);
 	(*amount) = box_amount;
@@ -283,7 +274,30 @@ box_t *box_add_sub(char *box_name) {
 	return box;
 }
 
-/* void data_kill() {
+void box_kill(box_t* box) {
+	mutex_lock(&box->content_mutex);
+	free(box->path);
+	free(box->pub_pipe_name);
+	cond_kill(&box->condvar);
+	mutex_unlock(&box->content_mutex);
+	mutex_kill(&box->content_mutex);
+}
+
+void data_kill() {
 	pcq_destroy(queue);
 	free(queue);
-} */
+	mutex_lock(&box_table_lock);
+	for (int i = 0; i < DEFAULT_BOX_LIMIT; i++) {
+		box_t *box = server_boxes[i];
+		if (free_box_table[i] == TAKEN) {
+			// If box was in use, delete its file from tfs
+			tfs_unlink(box->path);
+		}
+		box_kill(box);
+		free(box);
+	}
+	free(free_box_table);
+	free(server_boxes);
+	mutex_unlock(&box_table_lock);
+	mutex_kill(&box_table_lock);
+}
