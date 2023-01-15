@@ -207,6 +207,7 @@ int box_alloc(box_t *box) {
 	cond_init(&box->condvar);
 
 	box->path = (char*) myalloc(sizeof(char) * TFS_BOX_PATH_LEN);
+	box->pub_pipe_name = (char*) myalloc(sizeof(char) * CLIENT_PIPE_LENGTH);
 	memset(box->path, 0, TFS_BOX_PATH_LEN * sizeof(char));
 	box->path[0] = '/'; // Add slash for tfs_open
 	box->name = box->path + sizeof(char); // name is path without leading '/'
@@ -219,6 +220,7 @@ int box_alloc(box_t *box) {
 void box_kill(box_t* box) {
 	mutex_lock(&box->content_mutex);
 	free(box->path);
+	free(box->pub_pipe_name);
 	cond_kill(&box->condvar);
 	mutex_unlock(&box->content_mutex);
 	mutex_kill(&box->content_mutex);

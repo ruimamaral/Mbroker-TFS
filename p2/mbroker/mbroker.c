@@ -194,6 +194,11 @@ int handle_register_publisher(session_t *current) {
 		mutex_unlock(&box->content_mutex);
 		return -1;
 	}
+	// Gives box the publisher pipename so that we can unlock it from
+	// a blocking read during the box removal process.
+	memcpy(box->pub_pipe_name,
+			current->pipe_name, CLIENT_PIPE_LENGTH * sizeof(char));
+
 	printf("ok3\n");
 	while (true) {
 		uint8_t code;
