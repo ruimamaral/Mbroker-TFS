@@ -42,7 +42,7 @@ int pcq_create(pc_queue_t *queue, size_t capacity) {
 // If the queue is full, sleep until the queue has space
 int pcq_enqueue(pc_queue_t *queue, void *elem) {
 	// Lock does not allow two pushers running at the same time.
-	printf("ENTREI\n");
+	printf("entrei no enqueue\n");
 	mutex_lock(&queue->pcq_pusher_condvar_lock);
 	mutex_lock(&queue->pcq_current_size_lock);
 	while (queue->pcq_current_size == queue->pcq_capacity) {
@@ -52,7 +52,7 @@ int pcq_enqueue(pc_queue_t *queue, void *elem) {
 		cond_wait(&queue->pcq_pusher_condvar, &queue->pcq_pusher_condvar_lock);
 		mutex_lock(&queue->pcq_current_size_lock);
 	}
-	printf("Sai da espera\n");
+	printf("sai do lock do enqueue\n");
 	queue->pcq_current_size++;
 	mutex_unlock(&queue->pcq_current_size_lock);
 
@@ -82,6 +82,7 @@ void *pcq_dequeue(pc_queue_t *queue) {
 		cond_wait(&queue->pcq_popper_condvar, &queue->pcq_popper_condvar_lock);
 		mutex_lock(&queue->pcq_current_size_lock);
 	}
+	printf("levei dequeue\n");
 	queue->pcq_current_size--;
 	mutex_unlock(&queue->pcq_current_size_lock);
 

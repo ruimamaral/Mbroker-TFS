@@ -59,11 +59,15 @@ int handle_create_remove(int rp_fd,
 	send_request(rp_fd, build_manager_request(
 			code, pipe_name, box_name), REQUEST_WBOX_SIZE);
 
+	printf("este é o nome do pipe %s\n",pipe_name);
 	ALWAYS_ASSERT(cp_fd = open(
 			pipe_name, O_RDONLY) != -1, "Could not open client pipe.");
+	printf("eu abri\n");
 
 	read_pipe(cp_fd, &response_code, sizeof(uint8_t));
+	printf("eu li code %u\n",response_code);
 	read_pipe(cp_fd, &return_code, sizeof(uint32_t));
+	printf("eu li return code %u\n",return_code);
 	read_pipe(cp_fd, error_message, ERROR_MSG_LEN * sizeof(char));
 
 	if (code == MANAGER_CREATE_CODE) {
@@ -160,12 +164,11 @@ int handle_list(int rp_fd, char* pipe_name) {
 
 int main(int argc, char **argv) {
     print_usage();
-	char *pipe_name = argv[2];
 	int rp_fd;
 
 	ALWAYS_ASSERT(argc == 5 || argc == 4, "Invalid arguments.");
 
-	ALWAYS_ASSERT(mkfifo(pipe_name, 0777) != -1, "Could not create pipe.");
+	ALWAYS_ASSERT(mkfifo(argv[2], 0777) != -1, "Could not create pipe.");
 
 	ALWAYS_ASSERT((rp_fd = open(
 			argv[1], O_WRONLY)) != -1, "Could not open server pipe");
@@ -174,14 +177,14 @@ int main(int argc, char **argv) {
 
 	if (strcmp(operation, MANAGER_BOX_CREATE) == 0) {
 		return handle_create_remove(
-				rp_fd, pipe_name, argv[4], MANAGER_CREATE_CODE);
+				rp_fd, argv[2], argv[4], MANAGER_CREATE_CODE);
 	}
 	if (strcmp(operation, MANAGER_BOX_REMOVE) == 0) {
 		return handle_create_remove(
-				rp_fd, pipe_name, argv[4], MANAGER_REMOVE_CODE);
+				rp_fd, argv[2], argv[4], MANAGER_REMOVE_CODE);
 	}
 	if (strcmp(operation, MANAGER_BOX_LIST) == 0) {
-		return handle_list(rp_fd, pipe_name);
+		return handle_list(rp_fd, argv[2]);
 	}
 
 	PANIC("Invalid operation for manager.");

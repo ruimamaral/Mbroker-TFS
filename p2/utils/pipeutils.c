@@ -14,32 +14,33 @@ void requestcpy(void *request,
 }
 
 ssize_t write_pipe(int fd, void const *buffer, size_t buffer_size) {
-	printf("escrita1\n");
+	printf("entrei no write\n");
 	ssize_t written = 0;
 	// Keeps trying to write if the pipe is full
 	while (written < buffer_size) {
     	ssize_t ret = write(fd, buffer, buffer_size);
-		printf("ret->%zu\n",ret);
+		printf("escrevi ret->%zu\n",ret);
 		ALWAYS_ASSERT(ret > 0, "write to pipe failed");
 		written += ret;
 	}
-	printf("escrita\n");
+	printf("acabei write\n");
 	return written;
 }
 
 ssize_t read_pipe(int fd, void *buffer, size_t buffer_size) {
+	printf("entrei no read_request\n");
     ssize_t ret = read(fd, buffer, buffer_size);
 	ALWAYS_ASSERT(ret >= 0, "read from pipe failed");
-
+	printf("sai do read_request\n");
 	return ret;
 }
 
 ssize_t send_request(int fd, void* buffer, size_t buffer_size) {
-	printf("entrei no send\n");
+	printf("entrei no send_request\n");
 	printf("->%p\n",buffer);
 	ssize_t ret;
 	ret = write_pipe(fd, buffer, buffer_size);
-	printf("ret = %zu",ret);
+	printf("send_request ret = %zu\n",ret);
 	free(buffer);
 
 	return ret;

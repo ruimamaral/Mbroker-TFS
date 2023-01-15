@@ -68,7 +68,7 @@ int box_create(char *box_name) {
 		mutex_lock(&box->content_mutex);
 		if (free_box_table[i] == TAKEN && !strcmp(box->name, box_name)) {
 			// Box already exists
-			printf("NO->1\n");
+			printf("box is taken(cannot create\n");
 			mutex_unlock(&box->content_mutex);
 			mutex_unlock(&box_table_lock);
 			return -1;
@@ -76,18 +76,17 @@ int box_create(char *box_name) {
 		mutex_unlock(&box->content_mutex);
 		if (slot < 0 && free_box_table[i] == FREE) {
 			// First empty slot
-			printf("NO->2\n");
+			printf("box was free\n");
 			slot = i;
 		}
 	}
-	printf("EW\n");
+	printf("second part of box_create\n");
 	if (slot < 0) {
 		// No space
-		printf("NO->3\n");
+		printf("there was no slot to create box\n");
 		mutex_unlock(&box_table_lock);
 		return -2;
 	}
-	printf("EW2\n");
 	printf("CREATE BEFORE |||| box_path->%s||box_name->%s\n",box->path,box->name);
 
 	box = server_boxes[slot];
@@ -108,7 +107,7 @@ int box_create(char *box_name) {
 
 	mutex_unlock(&box->content_mutex);
 	mutex_unlock(&box_table_lock);
-	printf("YES\n");
+	printf("was able to create\n");
 	return 0;
 }
 

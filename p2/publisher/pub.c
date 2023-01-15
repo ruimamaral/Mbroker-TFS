@@ -29,7 +29,7 @@ uint8_t* publish_request(char *message) {
 	printf("entrei no publish\n");
 	size_t request_len = sizeof(uint8_t) + MAX_MSG_LENGTH * sizeof(char);
 
-	uint8_t* request = (uint8_t*) myalloc(request_len);
+	void* request = (void*) myalloc(request_len);
 	memset(request, 0, request_len);
 	uint8_t code = PUBLISH_CODE;
 	size_t request_offset = 0;
@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
 
 	// Waits for pipe to be opened server-side
 	ALWAYS_ASSERT((fd = open(
-			pipe_name, O_RDONLY)) != -1, "Cannot open pipe.");
+			pipe_name, O_WRONLY)) != -1, "Cannot open pipe.");
 
 	process_messages(fd);
 
