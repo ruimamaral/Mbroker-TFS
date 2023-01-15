@@ -98,7 +98,7 @@ int parse_node(int cp_fd, box_node_t *node) {
 			MANAGER_LIST_RESPONSE_CODE, "Unexpected code read from pipe.");
 
 	read_pipe(cp_fd, &node->last, sizeof(uint8_t));
-	read_pipe(cp_fd, &node->box_name, sizeof(MAX_BOX_NAME));
+	read_pipe(cp_fd, &node->box_name, MAX_BOX_NAME * sizeof(char));
 	if (node->last == 1 && strlen(node->box_name) == 0) {
 		// No boxes
 		return 1;
@@ -168,6 +168,7 @@ int handle_list(int rp_fd, char* pipe_name) {
 int main(int argc, char **argv) {
     print_usage();
 	int rp_fd;
+	int ret;
 
 	ALWAYS_ASSERT(argc == 5 || argc == 4, "Invalid arguments.");
 
@@ -182,17 +183,18 @@ int main(int argc, char **argv) {
 	if (strcmp(operation, MANAGER_BOX_CREATE) == 0) {
 		uint8_t create_code = MANAGER_CREATE_CODE;
 		printf("test print #$#$#$ >%d \n", create_code);
-		return handle_create_remove(
+		ret = handle_create_remove(
 				rp_fd, argv[2], argv[4], create_code);
-	}
-	if (strcmp(operation, MANAGER_BOX_REMOVE) == 0) {
+	} else if (strcmp(operation, MANAGER_BOX_REMOVE) == 0) {
 		uint8_t remove_code = MANAGER_REMOVE_CODE;
-		return handle_create_remove(
+		ret = handle_create_remove(
 				rp_fd, argv[2], argv[4], remove_code);
+	} else if (strcmp(operation, MANAGER_BOX_LIST) == 0) {
+		ret = handle_list(rp_fd, argv[2]);
+	} else {
+		PANIC("Invalid operation for manager.");
 	}
-	if (strcmp(operation, MANAGER_BOX_LIST) == 0) {
-		return handle_list(rp_fd, argv[2]);
-	}
-
-	PANIC("Invalid operation for manager.");
+	unlink(argv[2]);
+	close(rp_fd);
+	return ret;
 }

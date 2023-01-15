@@ -378,6 +378,7 @@ int handle_list_boxes(session_t* current) {
 	boxes = box_get_all(&box_amount);
 
 	if (box_amount == 0) {
+		last = 1;
 		char *box_name = (char*) myalloc(sizeof(char) * MAX_BOX_NAME);
 		size_t response_size = 
 				2 * sizeof(uint8_t) + sizeof(char) * MAX_BOX_NAME;
