@@ -41,11 +41,16 @@ int subscribe(int fd) {
 	char buffer[MAX_MSG_LENGTH];
 	while (true) {
 		ssize_t ret = read_pipe(fd, &code, sizeof(uint8_t));
-		if (code != SUB_RECEIVE_CODE) {
-			return -1;
+		if (code == 0) {
+			// Pipe closed
+			break;
 		}
+		ALWAYS_ASSERT(code ==
+				SUBSCRIBER_RESPONSE_CODE, "Unexpected code received.");
+
 		ret = read_pipe(fd, buffer, sizeof(buffer));
-		if (ret <= 0) {
+		if (ret == 0) {
+			// Pipe closed
 			break;
 		}
 		printf("%s\n", buffer);
@@ -61,6 +66,10 @@ int main(int argc, char **argv) {
 	char* pipe_name = argv[2];
 
     ALWAYS_ASSERT(argc == 4, "Invalid arguments.");
+    ALWAYS_ASSERT(strlen(pipe_name) < 256,
+			"Pipe name should have less than 256 characters.");
+    ALWAYS_ASSERT(strlen(argv[3]) < 32,
+			"Box name should have less than 32 characters.");
 
 	ALWAYS_ASSERT(mkfifo(
 			pipe_name, 0777) != -1, "Unable to create client pipe");
@@ -75,7 +84,9 @@ int main(int argc, char **argv) {
 	ALWAYS_ASSERT((fd = open(
 			pipe_name, O_RDONLY)) != -1, "Cannot open pipe.");
 
-	ALWAYS_ASSERT(subscribe(fd) != -1, "Unexpected code read from pipe");
+	ALWAYS_ASSERT(subscribe(fd) != -1, "Unexpected code received");
+
+	printf("Server ended the session.\n");
 
 	destroy(pipe_name, fd, rp_fd);
 

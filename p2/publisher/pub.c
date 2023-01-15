@@ -29,7 +29,7 @@ uint8_t* publish_request(char *message) {
 	printf("entrei no publish\n");
 	size_t request_len = sizeof(uint8_t) + MAX_MSG_LENGTH * sizeof(char);
 
-	void* request = (void*) myalloc(request_len);
+	uint8_t* request = (uint8_t*) myalloc(request_len);
 	memset(request, 0, request_len);
 	uint8_t code = PUBLISH_CODE;
 	size_t request_offset = 0;
@@ -117,6 +117,10 @@ int main(int argc, char **argv) {
 	char* pipe_name = argv[2];
 
     ALWAYS_ASSERT(argc == 4, "Invalid arguments.");
+    ALWAYS_ASSERT(strlen(pipe_name) < 256,
+			"Pipe name should have less than 256 characters.");
+    ALWAYS_ASSERT(strlen(argv[3]) < 32,
+			"Box name should have less than 32 characters.");
 
 	ALWAYS_ASSERT(mkfifo(
 			pipe_name, 0777) != -1, "Unable to create client pipe");

@@ -31,22 +31,24 @@ void listen_for_requests(char* pipe_name) {
 	if ((dummy_pipe = open(pipe_name, O_WRONLY)) == -1) {
 		PANIC("Cannot open dummy pipe - aborting.")
 	}
-	printf("dummy e server abrem no listen\n");
 	while(true) {
 		ses = (session_t*) myalloc(sizeof(session_t));
 		read_pipe(server_pipe, &ses->code, sizeof(uint8_t));
-		read_pipe(server_pipe, ses->pipe_name,sizeof(char) * CLIENT_PIPE_LENGTH);
+		printf("code read by server->%u\n", ses->code);
+		read_pipe(server_pipe,
+				ses->pipe_name,sizeof(char) * CLIENT_PIPE_LENGTH);
+
 		// Makes sure that the \0 character is always present
 		ses->pipe_name[CLIENT_PIPE_LENGTH - 1] = '\0';
 		switch(ses->code) {
-			case 7:
+			case MANAGER_LIST_CODE:
 				// List boxes request (doesn't have box_name parameter)
 				break;
 
 			case PUB_CREATION_CODE:
 			case SUB_CREATION_CODE:
 			case MANAGER_CREATE_CODE:
-			case 5:
+			case MANAGER_REMOVE_CODE:
 				read_pipe(server_pipe, ses->box_name,
 						sizeof(char) * MAX_BOX_NAME);
 				// Makes sure that the \0 character is always present
@@ -180,6 +182,7 @@ int handle_register_publisher(session_t *current) {
 	}
 	printf("ok1\n");
 	if ((box = box_add_pub(current->box_name)) == 0) {
+		// Box doesn't exist or it already has a publisher
 		close(cp_fd);
 		return -1;
 	}
@@ -253,8 +256,11 @@ int handle_register_publisher(session_t *current) {
 	return 0;
 }
 
-uint8_t *build_manager_response(int32_t ret_code, char *error_msg) {
-	uint8_t code = MANAGER_CREATE_RESPONSE_CODE;
+uint8_t *build_manager_response(
+		uint8_t code, int32_t ret_code, char *error_msg) {
+	
+	printf("building man response! > %d\n", code);
+
 	size_t size = MANAGER_RESPONSE_SIZE;
 	uint8_t* response = (uint8_t*) myalloc(size);
 	memset(response, 0, size);
@@ -263,7 +269,6 @@ uint8_t *build_manager_response(int32_t ret_code, char *error_msg) {
     requestcpy(response, &offset, &code, sizeof(uint8_t));
 	requestcpy(response, &offset, &ret_code, sizeof(int32_t));
     requestcpy(response, &offset, error_msg, ERROR_MSG_LEN * sizeof(char));
-	free(error_msg);
 	return response;
 }
 
@@ -271,12 +276,14 @@ int handle_create_box(session_t *current) {
 	int ret;
 	int32_t ret_code = 0;
 	int cp_fd;
-	void *error_msg = (void*) myalloc(ERROR_MSG_LEN * sizeof(char));
+	uint8_t response_code = MANAGER_CREATE_RESPONSE_CODE;
+	char *error_msg = (char*) myalloc(ERROR_MSG_LEN * sizeof(char));
 	memset(error_msg, 0, ERROR_MSG_LEN * sizeof(char));
 	printf("este será o pipe do create %s\n",current->pipe_name);
 	if ((cp_fd = open(current->pipe_name, O_WRONLY)) == -1) {
 		return -1;
 	}
+	printf("file descriptor IS: %d", cp_fd);
 
 	ret = box_create(current->box_name);
 
@@ -295,20 +302,18 @@ int handle_create_box(session_t *current) {
 		default:
 			return -1;
 	}
-<<<<<<< Updated upstream
-	send_request(cp_fd, build_manager_response(
-			ret_code, error_msg), MANAGER_RESPONSE_SIZE);
-=======
 	printf("handle_creat_box sending request: %d, %s\n", ret_code, error_msg);
 	send_request(cp_fd,
 			build_manager_response(response_code,
 			ret_code, error_msg), MANAGER_RESPONSE_SIZE);
 	printf("voltei\n");
 	printf("handle_creat_box sent request: %d, %s\n", ret_code, error_msg);
->>>>>>> Stashed changes
 
-	sleep(4); // Gives client process time to read the server response
+	free(error_msg);
+
+	sleep(1); // Gives client time to read the server response
 	close(cp_fd);
+	printf("closed the damn pipe my guy\n");
 	return ret;
 } 
 
@@ -334,8 +339,11 @@ int handle_remove_box(session_t* current) {
 		default:
 			return -1;
 	}
-	send_request(cp_fd, build_manager_response(
+	send_request(cp_fd,
+			build_manager_response(MANAGER_REMOVE_RESPONSE_CODE,
 			ret_code, error_msg), MANAGER_RESPONSE_SIZE);
+
+	free(error_msg);
 
 	sleep(1); // Gives client process time to read the server response
 	close(cp_fd);
@@ -401,6 +409,7 @@ int handle_list_boxes(session_t* current) {
 void* process_sessions() {
 	while (true) {
 		// If queue is empty, waits for a producer signal.
+		printf("waiting for next request\n");
 		session_t *current = (session_t*) pcq_dequeue(queue);
 		printf("process_sessions->saiu da queue\n");
 		printf("process sessions || code->%u|pathname->%s|box_name->%s\n",current->code,current->pipe_name,current->box_name);
