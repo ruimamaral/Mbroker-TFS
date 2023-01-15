@@ -61,17 +61,11 @@ int handle_create_remove(int rp_fd,
 	uint8_t response_code;
 	char error_message[ERROR_MSG_LEN];
 
-	ALWAYS_ASSERT(mkfifo("mypi.pipe", 0777) != -1, "Could not create pipe.");
-
-	send_request(rp_fd, build_manager_request(
-			code, "mypi.pipe", box_name), REQUEST_WBOX_SIZE);
+	send_request(rp_fd, build_manager_request(code, pipe_name, box_name), REQUEST_WBOX_SIZE);
 
 	printf("este é o nome do pipe %s\n",pipe_name);
-	ALWAYS_ASSERT(cp_fd = open(
-			"mypi.pipe", O_RDONLY) != -1, "Could not open client pipe.");
+	ALWAYS_ASSERT((cp_fd = open(pipe_name, O_RDONLY)) != -1, "Could not open client pipe.");
 	printf("eu abri fd: %d\n", cp_fd);
-	sleep(7);
-	printf("sleep is over\n");
 
 	read_pipe(cp_fd, &response_code, sizeof(uint8_t));
 	printf("eu li code %u\n",response_code);
@@ -163,8 +157,8 @@ int handle_list(int rp_fd, char* pipe_name) {
 	int cp_fd;
 	send_request(rp_fd, build_list_request(pipe_name), REQUEST_NO_BOX_SIZE);
 
-	ALWAYS_ASSERT(cp_fd = open(
-			pipe_name, O_RDONLY) != -1, "Could not open client pipe.");
+	ALWAYS_ASSERT((cp_fd = open(
+			pipe_name, O_RDONLY)) != -1, "Could not open client pipe.");
 
 	print_boxes(process_list_response(cp_fd));
 	close(cp_fd);
@@ -179,12 +173,6 @@ int main(int argc, char **argv) {
 
 	ALWAYS_ASSERT(mkfifo(argv[2], 0777) != -1, "Could not create pipe.");
 
-	ALWAYS_ASSERT((rp_fd = open(
-			argv[1], O_WRONLY)) != -1, "Could not open server pipe");
-	printf("register pipe fd: %d\n", rp_fd);
-	ALWAYS_ASSERT((rp_fd = open(
-			argv[1], O_WRONLY)) != -1, "Could not open server pipe");
-	printf("register pipe fd: %d\n", rp_fd);
 	ALWAYS_ASSERT((rp_fd = open(
 			argv[1], O_WRONLY)) != -1, "Could not open server pipe");
 	printf("register pipe fd: %d\n", rp_fd);
@@ -207,42 +195,4 @@ int main(int argc, char **argv) {
 	}
 
 	PANIC("Invalid operation for manager.");
-}
-
-int main(int argc, char **argv) {
-   	int rp_fd;
-	int fd;
-	char* pipe_name = argv[2];
-	uint8_t code = MANAGER_CREATE_CODE;
-	uint8_t response_code = MANAGER_CREATE_RESPONSE_CODE;
-
-    ALWAYS_ASSERT(argc == 5, "Invalid arguments.");
-    ALWAYS_ASSERT(strlen(pipe_name) < 256,
-			"Pipe name should have less than 256 characters.");
-    ALWAYS_ASSERT(strlen(argv[4]) < 32,
-			"Box name should have less than 32 characters.");
-
-	ALWAYS_ASSERT(mkfifo(
-			pipe_name, 0777) != -1, "Unable to create client pipe");
-
-	ALWAYS_ASSERT((rp_fd = open(
-			argv[1], O_WRONLY)) != -1, "Unable to open server pipe");
-
-    send_request(rp_fd,
-			build_manager_request(code, pipe_name, argv[4]), REQUEST_WBOX_SIZE);
-
-	// Waits for pipe to be opened server-side
-	ALWAYS_ASSERT((fd = open(
-			pipe_name, O_RDONLY)) != -1, "Cannot open pipe.");
-
-	read_pipe(fd, &response_code, sizeof(uint8_t));
-	printf("eu li code %u\n", response_code);
-
-	printf("FILE DESCRIPTOR OMFG %d", fd);
-
-	printf("Server ended the session.\n");
-
-	printf("Subscriber terminated.\n");
-
-    return 0;
 }
