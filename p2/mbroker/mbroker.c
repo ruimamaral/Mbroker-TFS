@@ -34,7 +34,7 @@ void listen_for_requests(char* pipe_name) {
 	while(true) {
 		ses = (session_t*) myalloc(sizeof(session_t));
 		read_pipe(server_pipe, &ses->code, sizeof(uint8_t));
-		printf("code read by server->%u\n", ses->code);
+
 		read_pipe(server_pipe,
 				ses->pipe_name,sizeof(char) * CLIENT_PIPE_LENGTH);
 
@@ -53,18 +53,14 @@ void listen_for_requests(char* pipe_name) {
 						sizeof(char) * MAX_BOX_NAME);
 				// Makes sure that the \0 character is always present
 				ses->box_name[MAX_BOX_NAME - 1] = '\0';
-				printf("Recebi pub/sub/create/remove code\n");
 				break;
 
 			default:
 				// Invalid code.
 				PANIC("Invalid code read by server.")
 		}
-		printf("before enqueue in listen_requests code->%u|pathname->%s|box_name->%s\n",ses->code,ses->pipe_name,ses->box_name);
 		// Signal to workers.
 		pcq_enqueue(queue, ses);
-		
-		printf("after enque in listen_requestscode-> %u ||| pipe_name-> %s ||| box_name-> %s\n",((session_t*)(queue->pcq_buffer[0]))->code,((session_t*)(queue->pcq_buffer[0]))->pipe_name,((session_t*)(queue->pcq_buffer[0]))->box_name);
 	}
 } 
 
@@ -176,17 +172,17 @@ int handle_register_publisher(session_t *current) {
 	box_t *box;
 	int cp_fd;
 	int tfs_fd; 
-	printf("cheguei\n");
+
 	if ((cp_fd = open(current->pipe_name, O_RDONLY)) == -1) {
 		return -1;
 	}
-	printf("ok1\n");
+
 	if ((box = box_add_pub(current->box_name)) == 0) {
 		// Box doesn't exist or it already has a publisher
 		close(cp_fd);
 		return -1;
 	}
-	printf("ok2\n");
+
 	if ((tfs_fd = tfs_open(box->path, TFS_O_APPEND)) == -1) {
 		close(cp_fd);
 		mutex_lock(&box->content_mutex);
@@ -199,15 +195,14 @@ int handle_register_publisher(session_t *current) {
 	memcpy(box->pub_pipe_name,
 			current->pipe_name, CLIENT_PIPE_LENGTH * sizeof(char));
 
-	printf("ok3\n");
+	
 	while (true) {
 		uint8_t code;
 		ssize_t ret;
 		char message[MAX_MSG_LENGTH];
 
 		ret = read_pipe(cp_fd, &code, sizeof(uint8_t));
-		printf("handle_publisher read_code->%zu",ret);
-		printf("handle_publisher readcode->%u\n",code);
+
 		// Lock to prevent signal leakage and/or data races from accessing box.
 		mutex_lock(&box->content_mutex);
 		// Checks if the box is undergoing the process of removal.
@@ -233,12 +228,12 @@ int handle_register_publisher(session_t *current) {
 		}
 
 		ret = read_pipe(cp_fd, message, sizeof(char) * MAX_MSG_LENGTH);
-		printf("handle_register_publisher read->%zu\n",ret);
+
 		if (ret == 0) {
 			// Pipe closed
 			break;
 		}
-		printf("MESSAGE_RECEIVED[%s]\n",message);
+
 		ret = tfs_write(tfs_fd, message, MAX_MSG_LENGTH);
 		if (ret < MAX_MSG_LENGTH) {
 			break; // Box ran out of space or write failed
@@ -264,8 +259,6 @@ int handle_register_publisher(session_t *current) {
 
 uint8_t *build_manager_response(
 		uint8_t code, int32_t ret_code, char *error_msg) {
-	
-	printf("building man response! > %d\n", code);
 
 	size_t size = MANAGER_RESPONSE_SIZE;
 	uint8_t* response = (uint8_t*) myalloc(size);
@@ -284,12 +277,11 @@ int handle_create_box(session_t *current) {
 	int cp_fd;
 	uint8_t response_code = MANAGER_CREATE_RESPONSE_CODE;
 	char *error_msg = (char*) myalloc(ERROR_MSG_LEN * sizeof(char));
+
 	memset(error_msg, 0, ERROR_MSG_LEN * sizeof(char));
-	printf("este será o pipe do create %s\n",current->pipe_name);
 	if ((cp_fd = open(current->pipe_name, O_WRONLY)) == -1) {
 		return -1;
 	}
-	printf("file descriptor IS: %d", cp_fd);
 
 	ret = box_create(current->box_name);
 
@@ -308,18 +300,16 @@ int handle_create_box(session_t *current) {
 		default:
 			return -1;
 	}
-	printf("handle_creat_box sending request: %d, %s\n", ret_code, error_msg);
+
 	send_request(cp_fd,
 			build_manager_response(response_code,
 			ret_code, error_msg), MANAGER_RESPONSE_SIZE);
-	printf("voltei\n");
-	printf("handle_creat_box sent request: %d, %s\n", ret_code, error_msg);
 
 	free(error_msg);
 
 	sleep(1); // Gives client time to read the server response
 	close(cp_fd);
-	printf("closed the damn pipe my guy\n");
+
 	return ret;
 } 
 
@@ -377,11 +367,11 @@ int handle_list_boxes(session_t* current) {
 	size_t box_amount;
 	box_t **boxes;
 	int cp_fd;
-
+	printf("ainda nao abri\n");
 	if ((cp_fd = open(current->pipe_name, O_WRONLY)) == -1) {
 		return -1;
 	}
-
+	printf("ABRI\n");
 	boxes = box_get_all(&box_amount);
 
 	if (box_amount == 0) {
@@ -417,14 +407,12 @@ int handle_list_boxes(session_t* current) {
 void* process_sessions() {
 	while (true) {
 		// If queue is empty, waits for a producer signal.
-		printf("waiting for next request\n");
 		session_t *current = (session_t*) pcq_dequeue(queue);
-		printf("process_sessions->saiu da queue\n");
-		printf("process sessions || code->%u|pathname->%s|box_name->%s\n",current->code,current->pipe_name,current->box_name);
+
 		// Pick handler function for each type of session
 		switch (current->code) {
 			case PUB_CREATION_CODE:
-				printf("huh\n");
+
 				handle_register_publisher(current);
 				break;
 			case SUB_CREATION_CODE:

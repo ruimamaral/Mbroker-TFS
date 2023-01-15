@@ -26,7 +26,7 @@ void destroy(char *pipe_name, int fd, int rp_fd) {
 }
 
 uint8_t* creation_request(char *pipe_name, char *box_name) {
-	printf("entrei\n");
+	
 	size_t request_len = sizeof(uint8_t)
 			+ (BOX_NAME_LENGTH + CLIENT_PIPE_LENGTH) * sizeof(char);
 
@@ -53,7 +53,7 @@ int subscribe(int fd) {
 
 		if (ret < 0) {
 			if (sigint_status == SIGINT) {
-				fprintf(stdout, "MESSAGES RECEIVED:\n");
+				fprintf(stdout, "\nMESSAGES RECEIVED:\n");
 				fprintf(stdout, "%d\n", count);
 				break;
 			}

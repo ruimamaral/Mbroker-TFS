@@ -26,7 +26,7 @@ void destroy(char *pipe_name, int fd, int rp_fd) {
 /// @param message 
 /// @return the message request
 uint8_t* build_publish_request(char *message) {
-	printf("entrei no publish\n");
+
 	size_t request_len = sizeof(uint8_t) + MAX_MSG_LENGTH * sizeof(char);
 
 	uint8_t* request = (uint8_t*) myalloc(request_len);
@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
 	// creates a request and proceeds to write it in the server pipe
 	send_request(rp_fd,
 			creation_request(pipe_name, argv[3]), REQUEST_WBOX_SIZE);
-	printf("MANDEI\n");
+			
 
 	// Waits for pipe to be opened server-side
 	ALWAYS_ASSERT((fd = open(

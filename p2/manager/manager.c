@@ -23,8 +23,6 @@ static void print_usage() {
 uint8_t* build_manager_request(
 		uint8_t code, char *pipe_name, char *box_name) {
 
-	printf("building man request: %u\n", code);
-
 	size_t request_size = REQUEST_WBOX_SIZE;
 
 	uint8_t* request = (uint8_t*) myalloc(request_size);
@@ -61,16 +59,16 @@ int handle_create_remove(int rp_fd,
 	uint8_t response_code;
 	char error_message[ERROR_MSG_LEN];
 
-	send_request(rp_fd, build_manager_request(code, pipe_name, box_name), REQUEST_WBOX_SIZE);
+	send_request(rp_fd, build_manager_request 
+			(code, pipe_name, box_name), REQUEST_WBOX_SIZE);
 
-	printf("este é o nome do pipe %s\n",pipe_name);
-	ALWAYS_ASSERT((cp_fd = open(pipe_name, O_RDONLY)) != -1, "Could not open client pipe.");
-	printf("eu abri fd: %d\n", cp_fd);
+	ALWAYS_ASSERT((cp_fd = open 
+			(pipe_name, O_RDONLY)) != -1, "Could not open client pipe.");
 
 	read_pipe(cp_fd, &response_code, sizeof(uint8_t));
-	printf("eu li code %u\n",response_code);
+
 	read_pipe(cp_fd, &return_code, sizeof(uint32_t));
-	printf("eu li return code %u\n",return_code);
+
 	read_pipe(cp_fd, error_message, ERROR_MSG_LEN * sizeof(char));
 
 	if (code == MANAGER_CREATE_CODE) {
@@ -139,6 +137,7 @@ box_node_t* process_list_response(int cp_fd) {
 		if (strcmp(head->box_name, new_node->box_name) >= 0) {
 			new_node->next = head;
 			head = new_node;
+			continue;
 		}
 		current = head;
 		while (current->next && strcmp(
@@ -155,8 +154,9 @@ box_node_t* process_list_response(int cp_fd) {
 int handle_list(int rp_fd, char* pipe_name) {
 
 	int cp_fd;
-	send_request(rp_fd, build_list_request(pipe_name), REQUEST_NO_BOX_SIZE);
 
+	send_request(rp_fd, build_list_request(pipe_name), REQUEST_NO_BOX_SIZE);
+	
 	ALWAYS_ASSERT((cp_fd = open(
 			pipe_name, O_RDONLY)) != -1, "Could not open client pipe.");
 
@@ -176,13 +176,12 @@ int main(int argc, char **argv) {
 
 	ALWAYS_ASSERT((rp_fd = open(
 			argv[1], O_WRONLY)) != -1, "Could not open server pipe");
-	printf("register pipe fd: %d\n", rp_fd);
-	
+
 	char* operation = argv[3];
 
 	if (strcmp(operation, MANAGER_BOX_CREATE) == 0) {
 		uint8_t create_code = MANAGER_CREATE_CODE;
-		printf("test print #$#$#$ >%d \n", create_code);
+
 		ret = handle_create_remove(
 				rp_fd, argv[2], argv[4], create_code);
 	} else if (strcmp(operation, MANAGER_BOX_REMOVE) == 0) {
