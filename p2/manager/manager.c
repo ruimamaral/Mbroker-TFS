@@ -17,12 +17,13 @@ static void print_usage() {
             "   manager <register_pipe_name> <pipe_name> list\n");
 }
 
-uint8_t* build_manager_request(uint8_t code,char *pipe_name, char *box_name) {
-	size_t request_len = sizeof(uint8_t)
-			+ (BOX_NAME_LENGTH + CLIENT_PIPE_LENGTH) * sizeof(char);
+uint8_t* build_manager_request(
+		uint8_t code, char *pipe_name, char *box_name) {
 
-	void* request = (void*) myalloc(request_len);
-	memset(request, 0, request_len);
+	size_t request_size = REQUEST_WBOX_SIZE;
+
+	uint8_t* request = (uint8_t*) myalloc(request_size);
+	memset(request, 0, request_size);
 	size_t request_offset = 0;
 
     requestcpy(request, &request_offset, &code, sizeof(uint8_t));
@@ -33,42 +34,67 @@ uint8_t* build_manager_request(uint8_t code,char *pipe_name, char *box_name) {
 	return request;
 }
 
-int read_return_request_function(int rp_fd,
+uint8_t* build_list_request(char *pipe_name) {
+	size_t request_size = REQUEST_NO_BOX_SIZE;
+
+	uint8_t* request = (uint8_t*) myalloc(request_size);
+	memset(request, 0, request_size);
+	size_t request_offset = 0;
+	uint8_t code = MANAGER_LIST_CODE;
+
+    requestcpy(request, &request_offset, &code, sizeof(uint8_t));
+    requestcpy(request, &request_offset,
+			pipe_name, CLIENT_PIPE_LENGTH * sizeof(char));
+	return request;
+}
+
+int handle_create_remove(int rp_fd,
 		char* pipe_name, char* box_name, uint8_t code) {
 
 	int cp_fd;
 	int32_t return_code;
-	char error_message[MAX_MSG_LENGTH];
-	if (send_request(rp_fd, build_manager_request(
-			code, pipe_name, box_name), REQUEST_PUBLISH_LEN)) {
-		return -1;
-	}
+	uint8_t response_code;
+	char error_message[ERROR_MSG_LEN];
+
+	send_request(rp_fd, build_manager_request(
+			code, pipe_name, box_name), REQUEST_WBOX_SIZE);
+
 	ALWAYS_ASSERT(cp_fd = open(
 			pipe_name, O_RDONLY) != -1, "Could not open client pipe.");
-	read_pipe(cp_fd, &code, sizeof(uint8_t));
-	read_pipe(cp_fd, &return_code, sizeof(uint32_t));
-	read_pipe(cp_fd, &error_message, ERROR_MSG_LEN * sizeof(char));
 
-	if (code != MANAGER_CREATE_RESPONSE_CODE) {
-		close(cp_fd);
-		return -1;
+	read_pipe(cp_fd, &response_code, sizeof(uint8_t));
+	read_pipe(cp_fd, &return_code, sizeof(uint32_t));
+	read_pipe(cp_fd, error_message, ERROR_MSG_LEN * sizeof(char));
+
+	if (code == MANAGER_CREATE_CODE) {
+		ALWAYS_ASSERT(response_code ==
+				MANAGER_CREATE_RESPONSE_CODE,
+				"Unexpected code read from pipe.");
+	} else {
+		ALWAYS_ASSERT(response_code ==
+				MANAGER_REMOVE_RESPONSE_CODE,
+				"Unexpected code read from pipe.");
+
 	}
-	ALWAYS_ASSERT(return_code == 0 || return_code == 1, "Return code invalid");
 	if (return_code == 0) {
 		fprintf(stdout, "OK\n");
-	} else if ( strlen(error_message) != 0) {
+	} else if (strlen(error_message) != 0) {
 		fprintf(stdout, "ERROR %s\n", error_message);
 	}
 	return 0;
 }
 
-int  parse_node(int cp_fd, box_node* node, uint64_t* last) {
-	read_pipe(cp_fd, last, sizeof(uint8_t));
+int parse_node(int cp_fd, box_node_t *node) {
+	uint8_t code;
+	read_pipe(cp_fd, &code, sizeof(uint8_t));
+	ALWAYS_ASSERT(code ==
+			MANAGER_LIST_RESPONSE_CODE, "Unexpected code read from pipe.");
+
+	read_pipe(cp_fd, &node->last, sizeof(uint8_t));
 	read_pipe(cp_fd, &node->box_name, sizeof(MAX_BOX_NAME));
-	if (*last == 1) {
-		if (strlen(node->box_name) == 0) {
-			return 1;
-		}
+	if (node->last == 1 && strlen(node->box_name) == 0) {
+		// No boxes
+		return 1;
 	}
 	read_pipe(cp_fd, &node->box_size, sizeof(uint64_t));
 	read_pipe(cp_fd, &node->n_publishers, sizeof(uint64_t));
@@ -77,85 +103,87 @@ int  parse_node(int cp_fd, box_node* node, uint64_t* last) {
 	return 0;
 }
 
-void print_boxes(box_node* head) {
-	box_node* current;
-	while(head) {
-		current = head;
-		head = head->next;
+void print_boxes(box_node_t* head) {
+	box_node_t* current = head;
+	box_node_t* previous;
+	while (current) {
 		fprintf(stdout, "%s %zu %zu %zu\n",
 				current->box_name, current->box_size,
 				current->n_publishers,current->n_subscribers);
-        free(current);
+		previous = current;
+		current = current->next;
+        free(previous);
     }
 }
 
-int get_boxes(int cp_fd) {
-	uint64_t last;
-	box_node* head = (box_node*) myalloc(sizeof(box_node));
-	if(parse_node(cp_fd, head, &last) == 1) {
+box_node_t* process_list_response(int cp_fd) {
+	box_node_t* head = (box_node_t*) myalloc(sizeof(box_node_t));
+	box_node_t* new_node = head;
+	box_node_t* current;
+	if (parse_node(cp_fd, head) == 1) {
 		free(head);
 		fprintf(stdout, "NO BOXES FOUND\n");
+		return NULL;
 	}
-	else {
-		while (last == 0) {
-			box_node* new_node = (box_node*) myalloc(sizeof(box_node));
-			parse_node(cp_fd, new_node, &last);
-			box_node* current = head;
-			while (current->next && strcmp(
-					new_node->box_name, current->box_name) < 0) {
-
-				current = current->next;
-			}
-			current = new_node->next;
+	while (new_node->last == 0) {
+		new_node = (box_node_t*) myalloc(sizeof(box_node_t));
+		parse_node(cp_fd, new_node);
+		// Compare to head of list
+		if (strcmp(head->box_name, new_node->box_name) >= 0) {
+			new_node->next = head;
+			head = new_node;
 		}
-		print_boxes(head);
+		current = head;
+		while (current->next && strcmp(
+				new_node->box_name, current->box_name) > 0) {
+
+			current = current->next;
+		}
+		new_node->next = current->next;
+		current->next = new_node;
 	}
-	return 0;
+	return head;
 }
 
-
-
-int treat_list_request(int rp_fd,
-		char* pipe_name, char* box_name, uint8_t code) {
+int handle_list(int rp_fd, char* pipe_name) {
 
 	int cp_fd;
-	send_request(rp_fd, build_manager_request(
-			code, pipe_name, box_name), REQUEST_PUBLISH_LEN);
+	// TEMP Está a dar erro aqui no meu, não sei porquê tho
+	send_request(rp_fd, build_list_request(pipe_name), REQUEST_NO_BOX_SIZE);
 
 	ALWAYS_ASSERT(cp_fd = open(
 			pipe_name, O_RDONLY) != -1, "Could not open client pipe.");
-	get_boxes(cp_fd);
+
+	print_boxes(process_list_response(cp_fd));
 	close(cp_fd);
 	return 0;
 }
-
-
 
 int main(int argc, char **argv) {
     print_usage();
 	char *pipe_name = argv[2];
 	int rp_fd;
-	int answer;
 
 	ALWAYS_ASSERT(argc == 5 || argc == 4, "Invalid arguments.");
-	ALWAYS_ASSERT(mkfifo(pipe_name, 0777) != -1, "Could not create pipe.");
-	ALWAYS_ASSERT((rp_fd = open(argv[1],
-			O_WRONLY)) != -1, "Could not open server pipe");
-	
-	char* manager_action = argv[3];
 
-	if (strcmp(manager_action, MANAGER_BOX_CREATE) == 0) {
-		answer = read_return_request_function(
-				rp_fd, pipe_name, argv[4],MANAGER_CREATE_CODE);
-	} else if (strcmp(manager_action, MANAGER_BOX_REMOVE) == 0) {
-		answer = read_return_request_function(
-				rp_fd, pipe_name, argv[4],MANAGER_REMOVE_CODE);
-	} else if (strcmp(manager_action, MANAGER_BOX_LIST) == 0) {
-		answer = treat_list_request(
-				rp_fd, pipe_name, argv[4],MANAGER_LIST_CODE);
-	} else {
-		// Invalid code.
-		PANIC("Invalid action for manager.");
+	ALWAYS_ASSERT(mkfifo(pipe_name, 0777) != -1, "Could not create pipe.");
+
+	ALWAYS_ASSERT((rp_fd = open(
+			argv[1], O_WRONLY)) != -1, "Could not open server pipe");
+	
+	char* operation = argv[3];
+
+	if (strcmp(operation, MANAGER_BOX_CREATE) == 0) {
+		return handle_create_remove(
+				rp_fd, pipe_name, argv[4], MANAGER_CREATE_CODE);
 	}
-	return answer;
+	if (strcmp(operation, MANAGER_BOX_REMOVE) == 0) {
+		return handle_create_remove(
+				rp_fd, pipe_name, argv[4], MANAGER_REMOVE_CODE);
+	}
+	if (strcmp(operation, MANAGER_BOX_LIST) == 0) {
+		return handle_list(rp_fd, pipe_name);
+	}
+
+	PANIC("Invalid operation for manager.");
 }

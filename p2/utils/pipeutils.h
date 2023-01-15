@@ -22,9 +22,9 @@
 #define BOX_NAME_LENGTH 32
 #define CLIENT_PIPE_LENGTH 256
 
-#define REQUEST_PUBLISH_LEN (sizeof(uint8_t) + CLIENT_PIPE_LENGTH \
+#define REQUEST_WBOX_SIZE (sizeof(uint8_t) + CLIENT_PIPE_LENGTH \
 		* sizeof(char) + BOX_NAME_LENGTH * sizeof(char))
-#define REQUEST_SUB_LEN REQUEST_PUBLISH_LEN
+#define REQUEST_NO_BOX_SIZE (sizeof(uint8_t) + MAX_MSG_LENGTH * sizeof(char));
 
 #define ERROR_MSG_LEN 1024
 
@@ -37,7 +37,6 @@
 #define MANAGER_BOX_CREATE "create"
 #define MANAGER_BOX_REMOVE "remove"
 #define MANAGER_BOX_LIST "list"
-
 
 #define MANAGER_CREATE_CODE 3
 #define MANAGER_CREATE_RESPONSE_CODE 4
@@ -52,8 +51,8 @@
 #define MANAGER_RESPONSE_SIZE (sizeof(char) * ERROR_MSG_LEN \
 		+ sizeof(int32_t) + sizeof(uint8_t))
 
-#define MANAGER_LIST_RESPOND_SIZE ( sizeof(uint8_t)*2 + sizeof(char)*MAX_BOX_NAME \
-		+ sizeof(uint64_t)*3)
+#define MANAGER_LIST_RESPOND_SIZE (sizeof(uint8_t) * 2 \
+		+ sizeof(char)*MAX_BOX_NAME + sizeof(uint64_t)*3)
 
 #define SET_ERROR(buf, msg, code) { \
 	memcpy(buf, msg, strlen(msg) * sizeof(char)); \

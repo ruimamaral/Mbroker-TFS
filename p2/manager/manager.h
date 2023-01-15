@@ -14,14 +14,14 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
-typedef struct box_node_t {
+typedef struct {
 	char box_name[MAX_BOX_NAME];
 	uint64_t n_subscribers;
 	uint64_t n_publishers ;
 	uint64_t box_size;
-	uint64_t last;
-	struct box_node_t* next;
-}box_node;
+	uint8_t last;
+	box_node_t* next;
+} box_node_t;
 
 	
 #endif

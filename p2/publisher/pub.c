@@ -21,15 +21,14 @@ void destroy(char *pipe_name, int fd, int rp_fd) {
     unlink(pipe_name);
 }
 
-
 /// @brief creates message request
 /// @param message 
 /// @return the message request
-void *publish_request(char *message) {
+uint8_t* publish_request(char *message) {
 	printf("entrei no publish\n");
 	size_t request_len = sizeof(uint8_t) + MAX_MSG_LENGTH * sizeof(char);
 
-	void* request = (void*) myalloc(request_len);
+	uint8_t* request = (uint8_t*) myalloc(request_len);
 	memset(request, 0, request_len);
 	uint8_t code = PUBLISH_CODE;
 	size_t request_offset = 0;
@@ -56,6 +55,7 @@ void process_messages(int fd) {
 			if (c == EOF) {
 				break;
 			}
+			// Reads until max length and truncates the rest of the message.
 			if (len >= MAX_MSG_LENGTH - 1) {
 				// Truncate text
 				while ((c = (char) getchar()) != '\n') {
@@ -70,9 +70,7 @@ void process_messages(int fd) {
 		printf("what\n");
 		len = 0;
  		// creates and writes the message request in the pipe
-		if (send_request(fd, publish_request(buffer),MAX_MSG_LENGTH) < 0) {
-			return;
-		}
+		send_request(fd, publish_request(buffer),MAX_MSG_LENGTH);
 		printf("MESSAGE_SENT[%s]\n",buffer);
 		if (c == EOF) {
 			break;
@@ -81,17 +79,16 @@ void process_messages(int fd) {
 	}
 }
 
-
 /// @brief 
 /// @param pipe_name 
 /// @param box_name 
-/// @return the request shape [ code = 1 (uint8_t) |
+/// @return the request format [ code = 1 (uint8_t) |
 ///	[ client_named_pipe_path (char[256]) ] | [ box_name (char[32]) ]
-void *creation_request(char *pipe_name, char *box_name) {
+uint8_t* creation_request(char *pipe_name, char *box_name) {
 	size_t request_len = sizeof(uint8_t)
 			+ (BOX_NAME_LENGTH + CLIENT_PIPE_LENGTH) * sizeof(char);
 
-	void* request = (void*) myalloc(request_len);
+	uint8_t* request = (uint8_t*) myalloc(request_len);
 	memset(request, 0, request_len);
 	uint8_t code = PUB_CREATION_CODE;
 	size_t request_offset = 0;
@@ -106,9 +103,10 @@ void *creation_request(char *pipe_name, char *box_name) {
 
 
 
-/// @brief Receives information, and proceeds to send a Request with the shape
-// 			[ code = 1 (uint8_t) | [ client_named_pipe_path (char[256]) ] | [ box_name (char[32]) ]
-//			and if accepted sends messages with the shape [ code = 9 (uint8_t) ] | [ message (char[1024]) ]
+/// @brief Receives information, and proceeds to send a Request with the format
+/// 		[ code = 1 (uint8_t) | [ client_named_pipe_path (char[256]) ]
+///			| [ box_name (char[32]) ] and if accepted sends messages
+///			with the format [ code = 9 (uint8_t) ] | [ message (char[1024]) ]
 /// @param argc 
 /// @param argv 
 /// @return
@@ -116,45 +114,30 @@ int main(int argc, char **argv) {
 	int rp_fd;
 	int fd;
 	char* pipe_name = argv[2];
-    if (argc != 4) {
-        printf("Number of input arguments is incorrect\n");
-        return -1;
-    }
 
+    ALWAYS_ASSERT(argc == 4, "Invalid arguments.");
 
-	if (mkfifo(pipe_name, 0777) == -1) {
-        printf("Unable to create client pipe\n");
-        return -1;
-    }
+	ALWAYS_ASSERT(mkfifo(
+			pipe_name, 0777) != -1, "Unable to create client pipe");
 
 	//opens the server's pipe on write mode
-    if ((rp_fd = open(argv[1], O_WRONLY)) == -1) {
-		printf("Unable to open server pipe\n");
-        return -1;
-    }
-	
-	//creates a request and proceeds to write it in the server pipe
-    if (send_request(rp_fd,
-			creation_request(pipe_name, argv[3]), REQUEST_PUBLISH_LEN) == -1 ) {
-		close(rp_fd);
-		unlink(pipe_name);
-        printf("Unable to send request to server\n");
-        return -1;
-    }
+	ALWAYS_ASSERT((rp_fd = open(
+			argv[1], O_WRONLY)) != -1, "Unable to open server pipe");
+
+	// creates a request and proceeds to write it in the server pipe
+	send_request(rp_fd,
+			creation_request(pipe_name, argv[3]), REQUEST_WBOX_SIZE);
 	printf("MANDEI\n");
+
 	// Waits for pipe to be opened server-side
-	if ((fd = open(pipe_name, O_WRONLY)) == -1) {
-		close(rp_fd);
-		unlink(pipe_name);
-        printf("Cannot open client pipe\n");
-		return -1;
-	}
+	ALWAYS_ASSERT((fd = open(
+			pipe_name, O_RDONLY)) != -1, "Cannot open pipe.");
 
 	process_messages(fd);
 
 	destroy(pipe_name, fd, rp_fd);
 
-	printf("Publisher terminated.");
+	printf("Publisher terminated.\n");
 
     return 0;
 }
