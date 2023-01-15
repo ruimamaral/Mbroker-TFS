@@ -295,8 +295,17 @@ int handle_create_box(session_t *current) {
 		default:
 			return -1;
 	}
+<<<<<<< Updated upstream
 	send_request(cp_fd, build_manager_response(
 			ret_code, error_msg), MANAGER_RESPONSE_SIZE);
+=======
+	printf("handle_creat_box sending request: %d, %s\n", ret_code, error_msg);
+	send_request(cp_fd,
+			build_manager_response(response_code,
+			ret_code, error_msg), MANAGER_RESPONSE_SIZE);
+	printf("voltei\n");
+	printf("handle_creat_box sent request: %d, %s\n", ret_code, error_msg);
+>>>>>>> Stashed changes
 
 	sleep(4); // Gives client process time to read the server response
 	close(cp_fd);
