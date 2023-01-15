@@ -357,7 +357,7 @@ uint8_t *build_list_boxes_response(uint8_t last, box_t* box) {
 	size_t offset = 0;
 
     requestcpy(response, &offset, &code, sizeof(uint8_t));
-	requestcpy(response, &offset, &last, sizeof(int32_t));
+	requestcpy(response, &offset, &last, sizeof(int8_t));
 	requestcpy(response, &offset, box->name, MAX_BOX_NAME * sizeof(char));
     requestcpy(response, &offset, &box->box_size, sizeof(uint64_t));
     requestcpy(response, &offset, &box->n_publishers, sizeof(uint64_t));
