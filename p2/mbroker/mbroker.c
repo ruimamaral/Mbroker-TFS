@@ -98,16 +98,16 @@ int handle_register_subscriber(session_t *current) {
 		return -1;
 	}
 
+	if ((box = box_add_sub(current->box_name)) == 0) {
+		close(cp_fd);
+		return -1;
+	}
+
 	if ((tfs_fd = tfs_open(box->path, 0)) == -1) {
 		close(cp_fd);
 		return -1;
 	}
 
-	if ((box = box_add_sub(current->box_name)) == 0) {
-		close(cp_fd);
-		tfs_close(tfs_fd);
-		return -1;
-	}
 	
 	while (true) {
 		ssize_t ret;
@@ -178,16 +178,16 @@ int handle_register_publisher(session_t *current) {
 		return -1;
 	}
 
+	if ((box = box_add_pub(current->box_name)) == 0) {
+		close(cp_fd);
+		return -1;
+	}
+
 	if ((tfs_fd = tfs_open(box->path, TFS_O_APPEND)) == -1) {
 		close(cp_fd);
 		return -1;
 	}
 
-	if ((box = box_add_pub(current->box_name)) == 0) {
-		close(cp_fd);
-		tfs_close(tfs_fd);
-		return -1;
-	}
 
 	while (true) {
 		uint8_t code;
@@ -326,8 +326,8 @@ int handle_remove_box(session_t* current) {
 	return ret;
 }
 uint8_t *build_list_boxes_response(uint8_t last, box_t* box) {
-	uint8_t code = LIST_BOXES_RESPONSE_CODE;
-	size_t size = LIST_BOXES_RESPONSE_SIZE;
+	uint8_t code = MANAGER_LIST_RESPONSE_CODE;
+	size_t size = MANAGER_LIST_RESPOND_SIZE;
 	uint8_t* response = (uint8_t*) myalloc(size);
 	memset(response, 0, size);
 	size_t offset = 0;
@@ -335,14 +335,13 @@ uint8_t *build_list_boxes_response(uint8_t last, box_t* box) {
     requestcpy(response, &offset, &code, sizeof(uint8_t));
 	requestcpy(response, &offset, &last, sizeof(int32_t));
 	requestcpy(response, &offset, box->name, MAX_BOX_NAME * sizeof(char));
-    requestcpy(response, &offset, box->box_size, sizeof(uint64_t));
-    requestcpy(response, &offset, box->n_publishers, sizeof(uint64_t));
-    requestcpy(response, &offset, box->n_subscribers, sizeof(uint64_t));
+    requestcpy(response, &offset, &box->box_size, sizeof(uint64_t));
+    requestcpy(response, &offset, &box->n_publishers, sizeof(uint64_t));
+    requestcpy(response, &offset, &box->n_subscribers, sizeof(uint64_t));
 	return response;
 }
 
 int handle_list_boxes(session_t* current) {
-	int ret;
 	uint8_t last = 0;
 	size_t box_amount;
 	box_t **boxes;
@@ -354,12 +353,12 @@ int handle_list_boxes(session_t* current) {
 
 	boxes = box_get_all(&box_amount);
 
-	if (box_amount = 0) {
+	if (box_amount == 0) {
 		char *box_name = (char*) myalloc(sizeof(char) * MAX_BOX_NAME);
 		size_t response_size = 
 				2 * sizeof(uint8_t) + sizeof(char) * MAX_BOX_NAME;
-		uint8_t *response = (char*) myalloc(response_size);
-		uint8_t code = LIST_BOXES_RESPONSE_CODE;
+		uint8_t *response = (uint8_t*) myalloc(response_size);
+		uint8_t code = MANAGER_LIST_RESPONSE_CODE;
 		size_t offset = 0;
 		memset(box_name, 0, MAX_BOX_NAME);
 		memset(response, 0, response_size);
@@ -372,15 +371,15 @@ int handle_list_boxes(session_t* current) {
 		return 0;
 	}
 	for (int i = 0; i < box_amount; i++) {
-		if (i = box_amount - 1) {
+		if (i == box_amount - 1) {
 			last = 1;
 		}
 		send_request(cp_fd, build_list_boxes_response(
-				last, boxes[i]), LIST_BOXES_RESPONSE_SIZE);
+				last, boxes[i]), MANAGER_LIST_RESPOND_SIZE);
 		free(boxes[i]);
 	}
-
 	free(boxes);
+	return 0;
 }
 
 void* process_sessions() {
@@ -403,7 +402,7 @@ void* process_sessions() {
 			case MANAGER_REMOVE_CODE:
 				handle_remove_box(current);
 				break;
-			case LIST_BOXES_CODE:
+			case MANAGER_LIST_CODE:
 				handle_list_boxes(current);
 				break;
 			default:

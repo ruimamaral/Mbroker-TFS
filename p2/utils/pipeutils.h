@@ -29,6 +29,8 @@
 #define ERROR_MSG_LEN 1024
 
 #define ERR_BOX_EXISTS "Box already exists!"
+#define ERR_BOX_DOESNT_EXIST "Box does not exist!"
+
 #define ERR_TOO_MANY_BOXES "Max amount of boxes reached!"
 #define ERR_TFS_FAIL "Could not create file in tfs!"
 
@@ -49,6 +51,9 @@
 
 #define MANAGER_RESPONSE_SIZE (sizeof(char) * ERROR_MSG_LEN \
 		+ sizeof(int32_t) + sizeof(uint8_t))
+
+#define MANAGER_LIST_RESPOND_SIZE ( sizeof(uint8_t)*2 + sizeof(char)*MAX_BOX_NAME \
+		+ sizeof(uint64_t)*3)
 
 #define SET_ERROR(buf, msg, code) { \
 	memcpy(buf, msg, strlen(msg) * sizeof(char)); \
