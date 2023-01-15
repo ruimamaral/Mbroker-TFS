@@ -105,9 +105,11 @@ int handle_register_subscriber(session_t *current) {
 
 	if ((tfs_fd = tfs_open(box->path, 0)) == -1) {
 		close(cp_fd);
+		mutex_lock(&box->content_mutex);
+		box->n_subscribers--;
+		mutex_unlock(&box->content_mutex);
 		return -1;
 	}
-
 	
 	while (true) {
 		ssize_t ret;
@@ -185,9 +187,11 @@ int handle_register_publisher(session_t *current) {
 
 	if ((tfs_fd = tfs_open(box->path, TFS_O_APPEND)) == -1) {
 		close(cp_fd);
+		mutex_lock(&box->content_mutex);
+		box->n_publishers--;
+		mutex_unlock(&box->content_mutex);
 		return -1;
 	}
-
 
 	while (true) {
 		uint8_t code;
