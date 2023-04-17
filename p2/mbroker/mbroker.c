@@ -162,8 +162,8 @@ uint8_t *build_subscriber_response(char *message) {
 	memset(response, 0, size);
 	size_t offset = 0;
 
-    requestcpy(response, &offset, &code, sizeof(uint8_t));
-    requestcpy(response, &offset,
+	requestcpy(response, &offset, &code, sizeof(uint8_t));
+	requestcpy(response, &offset,
 		message, MAX_MSG_LENGTH * sizeof(char));
 	return response;
 }
@@ -265,9 +265,9 @@ uint8_t *build_manager_response(
 	memset(response, 0, size);
 	size_t offset = 0;
 
-    requestcpy(response, &offset, &code, sizeof(uint8_t));
+	requestcpy(response, &offset, &code, sizeof(uint8_t));
 	requestcpy(response, &offset, &ret_code, sizeof(int32_t));
-    requestcpy(response, &offset, error_msg, ERROR_MSG_LEN * sizeof(char));
+	requestcpy(response, &offset, error_msg, ERROR_MSG_LEN * sizeof(char));
 	return response;
 }
 
@@ -353,12 +353,12 @@ uint8_t *build_list_boxes_response(uint8_t last, box_t* box) {
 	memset(response, 0, size);
 	size_t offset = 0;
 
-    requestcpy(response, &offset, &code, sizeof(uint8_t));
+	requestcpy(response, &offset, &code, sizeof(uint8_t));
 	requestcpy(response, &offset, &last, sizeof(int8_t));
 	requestcpy(response, &offset, box->name, MAX_BOX_NAME * sizeof(char));
-    requestcpy(response, &offset, &box->box_size, sizeof(uint64_t));
-    requestcpy(response, &offset, &box->n_publishers, sizeof(uint64_t));
-    requestcpy(response, &offset, &box->n_subscribers, sizeof(uint64_t));
+	requestcpy(response, &offset, &box->box_size, sizeof(uint64_t));
+	requestcpy(response, &offset, &box->n_publishers, sizeof(uint64_t));
+	requestcpy(response, &offset, &box->n_subscribers, sizeof(uint64_t));
 	return response;
 }
 
